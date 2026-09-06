@@ -33,8 +33,8 @@ rail on the right, where GO becomes a tall thumb target:
   keep running under spot effects in an otherwise exclusive show.
 - **Import from anywhere** — the system file picker also reaches Google Drive, Dropbox and
   OneDrive when those apps are installed. No accounts to connect.
-- **Record** from the microphone or a line input, with the browser's speech processing turned off
-  so music keeps its dynamics.
+- **Record** from the microphone or any external input, with a device picker for USB-C audio
+  interfaces and the browser's speech processing turned off so music keeps its dynamics.
 - **Foot pedal support** — space, enter, right-arrow and page-down all fire GO, so most Bluetooth
   page-turner pedals work as a GO footswitch for free.
 - **Works offline**, installs to the home screen, and keeps the screen and audio session awake
@@ -87,14 +87,27 @@ stops everything.
 
 ## Recording from Spotify, YouTube or Apple Music
 
-Play the track on a **different device** or through a speaker and capture it with the phone's
-microphone — or feed it in through a USB-C/Lightning audio interface for a clean line-level
-signal.
+You cannot read those apps' audio streams directly. iOS exposes no system-audio API at all, and
+Android streaming apps mark their sessions `ALLOW_CAPTURE_BY_NONE` so `MediaProjection` hands back
+silence. `getDisplayMedia({ audio: true })` — the one web API that can capture tab or system audio
+— is desktop-only and is not implemented on Chrome for Android or iOS Safari at all. This is a DRM
+wall, not a gap in the web platform, and no app on either store gets around it.
 
-Direct capture of those apps is not possible on either mobile platform: iOS exposes no
-system-audio API at all, and Android streaming apps mark their sessions `ALLOW_CAPTURE_BY_NONE`,
-so `MediaProjection` hands back silence. This is a DRM wall, not a limitation of the web platform,
-and no app on either store gets around it.
+What does work is capturing the sound *after* it leaves the app, on the same phone:
+
+**1. Line loopback — the good one.** Plug in a USB-C audio interface and patch its output back
+into its input, then select it under **Input** in the recorder. The phone plays the track out and
+records it straight back at line level: clean stereo, no room noise. This is why the recorder has
+an input picker.
+
+**2. Speaker to microphone — the quick one.** Start playback, come back to CueTap, and record the
+built-in mic while the track plays out loud. No extra hardware, but you get mono, room
+reflections, and whatever else the room is doing.
+
+On iPhone, **start playback before you open the recorder** — Safari suspends audio the moment it
+is backgrounded, so you cannot leave CueTap to hit play mid-take. The recorder arms its input as
+soon as you open it, so watch the meter for a second to confirm the other app is still audible
+before committing to a take.
 
 The recorder disables echo cancellation, noise suppression and auto gain — these are tuned for
 speech and would pump and gate music badly. Watch the meter, because nothing is protecting you
