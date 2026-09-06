@@ -11,6 +11,7 @@ import ArmScreen from './views/ArmScreen'
 import SpotifySearch from './views/SpotifySearch'
 import AddCue from './views/AddCue'
 import { completeLoginFromRedirect, isConnected, subscribeAuth } from './spotify/auth'
+import { spotify } from './spotify/player'
 import Transport from './components/Transport'
 
 export type ViewMode = 'pads' | 'list'
@@ -29,6 +30,18 @@ export default function App() {
 
   useEffect(() => subscribeAuth(() => setSpotifyOn(isConnected())), [])
 
+  // Fetch the Web Playback SDK as soon as Spotify is connected, so arm() can
+  // construct and connect the player inside the tap. And surface SDK errors it
+  // reports asynchronously — a bad token or a non-Premium account shows up here,
+  // after the REST play call has already returned OK.
+  useEffect(() => {
+    if (!spotifyOn) return
+    void spotify.preload()
+    return spotify.subscribe(() => {
+      if (spotify.error) setError(spotify.error)
+    })
+  }, [spotifyOn, setError])
+
   // Spotify sends the browser back here with ?code=...; consume it once on load.
   useEffect(() => {
     completeLoginFromRedirect().catch((e: unknown) =>
@@ -37,6 +50,11 @@ export default function App() {
   }, [setError])
 
   const arm = useCallback(async () => {
+    // Kick the Spotify player up first, while the tap is freshest: init() calls
+    // activateElement(), which browsers only honour under a live user gesture.
+    // Not awaited — the device can take seconds to report ready and a file-only
+    // show must not wait. Errors surface through the spotify.subscribe wiring.
+    if (isConnected()) void spotify.init().catch(() => {})
     await engine.unlock()
     if (show.settings.liveMode) await engine.enableLiveMode()
     engine.setMasterGain(show.settings.masterGain)

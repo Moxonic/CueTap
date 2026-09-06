@@ -13,6 +13,13 @@ interface SpotifyPlayer {
   pause(): Promise<void>
   resume(): Promise<void>
   getCurrentState(): Promise<{ position: number; paused: boolean; duration: number } | null>
+  /**
+   * Unlock the SDK's internal <audio> element. Browsers require this to be
+   * called from a user gesture; without it playback transfers to the device
+   * name but no audio plays and transport calls fail with "no list was loaded".
+   * Present since SDK 1.5.7; typed optional so an older SDK does not crash.
+   */
+  activateElement?(): Promise<void>
 }
 
 declare global {
@@ -66,6 +73,18 @@ class SpotifyPlayback {
   }
 
   /**
+   * Fetch the SDK script ahead of time, without constructing a player. Called
+   * when Spotify connects so that at arm time `init()` can run `connect()`
+   * synchronously inside the tap — the SDK's audio element is only unlocked for
+   * autoplay if `connect()` happens within a user gesture.
+   */
+  preload(): Promise<void> {
+    return loadSdk().catch(() => {
+      /* retried by init() */
+    })
+  }
+
+  /**
    * Bring up the SDK device. Idempotent and shared: cues fire concurrently and
    * must not each try to construct a player.
    */
@@ -84,6 +103,16 @@ class SpotifyPlayback {
         // The SDK's own volume; per-cue level is applied on top of this.
         volume: 1,
       })
+
+      // Unlock the audio element. This must ride on a user gesture, which is why
+      // init() is called from the arm tap and the SDK is preloaded beforehand —
+      // so this line runs while the tap is still the active user activation.
+      // Without it the first cue fails with "no list was loaded".
+      try {
+        await player.activateElement?.()
+      } catch {
+        /* no gesture in scope; the play call will report the real failure */
+      }
 
       player.addListener('ready', ((e: { device_id: string }) => {
         this.deviceId = e.device_id
