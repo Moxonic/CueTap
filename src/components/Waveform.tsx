@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { decorativePeaks } from '../lib/decorPeaks'
 import { formatClock } from '../lib/format'
 
 interface Props {
@@ -11,6 +12,12 @@ interface Props {
   color: string
   /** seconds, or null when the cue is not sounding */
   position: number | null
+  /**
+   * Stable key for a cue with no waveform data — the Spotify URI. Given one,
+   * the strip draws a decorative shape seeded from it, watermarked so it is not
+   * read as the real track. See lib/decorPeaks.
+   */
+  seed?: string
   onChange: (inPoint: number, outPoint: number) => void
 }
 
@@ -26,62 +33,40 @@ function tickStep(duration: number, width: number): number {
   return TICK_STEPS.find((s) => s >= target) ?? TICK_STEPS[TICK_STEPS.length - 1]
 }
 
-interface TimelineOpts {
-  width: number
-  h: number
-  duration: number
-  inX: number
-  outX: number
-  color: string
-  /** seconds, or null when the cue is not sounding */
-  position: number | null
-}
-
 /**
- * The stand-in for a waveform on a streaming cue: a ruled band that shows the
- * selection, how far through the track the playhead is, and where the minutes
- * fall. Everything here is information the app genuinely has.
+ * Ruler and disclaimer drawn over a decorative shape.
+ *
+ * The shape underneath is invented, so the ruler is what a trim point can
+ * actually be judged against, and the watermark is what stops the shape being
+ * read as the track. Both belong on top of the bars, not behind them.
  */
-function drawTimeline(ctx: CanvasRenderingContext2D, o: TimelineOpts): void {
-  const { width, h, duration, inX, outX, color, position } = o
-  const bandH = Math.max(10, Math.round(h * 0.42))
-  const bandY = Math.round((h - bandH) / 2)
-
-  // The full track, then the selected span picked out in the cue's colour.
-  ctx.fillStyle = 'rgba(255,255,255,0.10)'
-  ctx.fillRect(0, bandY, width, bandH)
-  ctx.fillStyle = color
-  ctx.globalAlpha = 0.32
-  ctx.fillRect(inX, bandY, Math.max(0, outX - inX), bandH)
-  ctx.globalAlpha = 1
-
-  // Elapsed fill. Without a waveform this is the only cue to how far in you are,
-  // so it carries more weight here than the playhead line does on a file cue.
-  if (position !== null) {
-    const px = Math.max(inX, Math.min(outX, (position / duration) * width))
-    ctx.fillStyle = color
-    ctx.globalAlpha = 0.85
-    ctx.fillRect(inX, bandY, Math.max(0, px - inX), bandH)
-    ctx.globalAlpha = 1
-  }
-
-  // Minute ruler, so a trim point can be judged against the clock.
+function drawStreamOverlay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  h: number,
+  duration: number,
+): void {
   const step = tickStep(duration, width)
   ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace'
   ctx.textBaseline = 'top'
+
   for (let t = step; t < duration; t += step) {
     const x = Math.round((t / duration) * width) + 0.5
-    ctx.fillStyle = 'rgba(255,255,255,0.22)'
-    ctx.fillRect(x, bandY - 5, 1, bandH + 10)
-    ctx.fillStyle = 'rgba(255,255,255,0.45)'
-    ctx.fillText(formatClock(t), x + 3, bandY + bandH + 7)
+    ctx.fillStyle = 'rgba(255,255,255,0.20)'
+    ctx.fillRect(x, 0, 1, h)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    ctx.fillText(formatClock(t), x + 3, h - 14)
   }
 
-  // Track length at the tail, right-aligned so it never collides with a tick.
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'
   ctx.textAlign = 'right'
-  ctx.fillText(formatClock(duration), width - 4, bandY - 17)
+  ctx.fillText(formatClock(duration), width - 4, h - 14)
   ctx.textAlign = 'left'
+
+  // Say what this is. Spotify exposes no waveform, so the shape is decoration
+  // and trimming by eye against it would be wrong.
+  ctx.fillStyle = 'rgba(255,255,255,0.42)'
+  ctx.fillText('shape is indicative — Spotify exposes no waveform', 4, 3)
 }
 
 export default function Waveform({
@@ -93,12 +78,20 @@ export default function Waveform({
   fadeOut,
   color,
   position,
+  seed,
   onChange,
 }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [width, setWidth] = useState(0)
   const [dragging, setDragging] = useState<'in' | 'out' | null>(null)
+
+  // Seeded once per track, not per paint: the shape has to be stable or the
+  // strip shimmers on every position tick.
+  const decor = useMemo(
+    () => (peaks.length === 0 && seed ? decorativePeaks(seed) : null),
+    [peaks.length, seed],
+  )
 
   useEffect(() => {
     const el = wrap.current
@@ -125,31 +118,30 @@ export default function Waveform({
     const inX = (inPoint / duration) * width
     const outX = (outPoint / duration) * width
 
-    // Streaming cues expose no waveform data: Spotify decodes in a protected
-    // pipeline, and the Audio Analysis endpoint that once carried a loudness
-    // envelope is closed to apps registered since November 2024. So there is no
-    // amplitude to draw, and inventing a shape would imply detail the app does
-    // not have. Draw a timeline instead — the thing trimming actually needs is
-    // where you are in the track, not what it looks like.
-    const flat = peaks.length === 0
-    if (flat) {
-      drawTimeline(ctx, {
-        width,
-        h,
-        duration,
-        inX,
-        outX,
-        color,
-        position,
-      })
-    } else {
+    // `shape` is the real analysis for a file cue, and a seeded decoration for a
+    // streaming one — Spotify never exposes amplitude, so there is nothing true
+    // to draw. Both render through the same bars; the streaming case is marked
+    // by the overlay below and dimmed so it does not read as measured data.
+    const shape = peaks.length > 0 ? peaks : decor
+    const invented = peaks.length === 0 && decor !== null
+    const playX = position === null ? null : (position / duration) * width
+
+    if (shape) {
       for (let x = 0; x < width; x++) {
-        const peak = peaks[Math.floor((x / width) * peaks.length)] ?? 0
+        const peak = shape[Math.floor((x / width) * shape.length)] ?? 0
         const bar = Math.max(1, peak * (h * 0.86))
         const inside = x >= inX && x <= outX
         ctx.fillStyle = inside ? color : 'rgba(255,255,255,0.13)'
+        // On a streaming cue the elapsed sweep is the only real position
+        // feedback there is, so played bars stay bright and the rest recedes.
+        ctx.globalAlpha = !invented || !inside ? 1 : playX !== null && x <= playX ? 0.95 : 0.5
         ctx.fillRect(x, mid - bar / 2, 1, bar)
+        ctx.globalAlpha = 1
       }
+    } else {
+      // No peaks and no seed: a flat band rather than a blank strip.
+      ctx.fillStyle = 'rgba(255,255,255,0.13)'
+      ctx.fillRect(0, mid - 2, width, 4)
     }
 
     // Trimmed-away regions get knocked back further.
@@ -177,9 +169,12 @@ export default function Waveform({
       if (fo > 0) ctx.lineTo(outX, h - 2)
       ctx.stroke()
     }
+
+    // Last, so the ruler and the disclaimer survive the trim shading above them.
+    if (invented) drawStreamOverlay(ctx, width, h, duration)
     // `position` only participates for streaming cues, where it drives the
-    // elapsed fill; file cues get their playhead from the DOM element below.
-  }, [peaks, duration, inPoint, outPoint, fadeIn, fadeOut, color, width, position])
+    // elapsed sweep; file cues get their playhead from the DOM element below.
+  }, [peaks, decor, duration, inPoint, outPoint, fadeIn, fadeOut, color, width, position])
 
   const timeAt = useCallback(
     (clientX: number): number => {

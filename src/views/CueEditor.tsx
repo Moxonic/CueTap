@@ -104,6 +104,7 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
           fadeOut={cue.fadeOut}
           color={cue.color}
           position={state?.playing ? state.position : null}
+          seed={cue.spotify?.uri}
           onChange={(inPoint, outPoint) => set({ inPoint, outPoint })}
         />
         <div className="wave-tools">

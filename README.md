@@ -144,7 +144,7 @@ the difference is real:
 | Volume | GainNode | `setVolume()` |
 | Fade in / out | Equal-power, sample-accurate | Stepped on a 50 ms timer |
 | Trim in / out | Sample-accurate | `seek()`, roughly 100 ms |
-| Trim display | Real waveform peaks | Ruled timeline — no amplitude exists to draw |
+| Trim display | Real waveform peaks | Decorative shape + ruler — no amplitude exists to draw |
 | Seamless loop | Zero gap, no drift | Seeks back — short audible gap each pass |
 | Crossfade loop | Yes | Not possible — there is only one player |
 | Layering | Unlimited | One Spotify cue at a time |
@@ -154,12 +154,18 @@ the difference is real:
 The editor hides the controls a Spotify cue cannot honour rather than letting you set something
 that will not be heard.
 
-**There is no waveform for a Spotify track, and there cannot be.** The audio never reaches an
-`AudioContext`, and the Audio Analysis endpoint that used to expose a loudness envelope was
+**The waveform on a Spotify cue is decorative, and the app says so on the strip itself.** No real
+amplitude is obtainable: the audio never reaches an `AudioContext`, and the Audio Analysis endpoint
+that used to expose a loudness envelope was
 [closed to newly registered apps in November 2024](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api),
-along with Audio Features and the 30-second preview URLs. Rather than invent a shape, the trim
-strip becomes a ruled timeline: the selected span in the cue's colour, minute ticks, and an
-elapsed fill that tracks the playhead while the cue runs. Everything it shows is real.
+along with Audio Features and the 30-second preview URLs. So the shape is generated from a hash of
+the track URI — stable for a given track, different between tracks, and watermarked *shape is
+indicative — Spotify exposes no waveform*. Over it sit the things that are real: minute ticks, the
+selected span, and an elapsed sweep that brightens the bars as the cue plays.
+
+**Do not set a trim point by eye on a Spotify cue.** The peaks are invented, so a transient you can
+see is not one you will hear. Play the cue and use **In at playhead** / **Out at playhead**, or work
+from the clock against the ruler.
 
 **Use Spotify cues for preshow, interval and playoff music.** Use a local file for anything that
 has to land on a visual cue — a doorbell or a thunder crack triggered over the network will arrive
