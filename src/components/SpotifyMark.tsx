@@ -8,7 +8,16 @@
  * `mono` draws the arcs in the current text colour on a transparent ground, for
  * use inside a coloured chip where a green circle would fight the chip.
  */
-export default function SpotifyMark({ size = 20, mono = false }: { size?: number; mono?: boolean }) {
+export default function SpotifyMark({
+  size = 20,
+  mono = false,
+  muted = false,
+}: {
+  size?: number
+  mono?: boolean
+  /** Greyed out — used to show that Spotify is not connected. */
+  muted?: boolean
+}) {
   return (
     <svg
       width={size}
@@ -18,7 +27,7 @@ export default function SpotifyMark({ size = 20, mono = false }: { size?: number
       aria-label="Spotify"
       focusable="false"
     >
-      {!mono && <circle cx="12" cy="12" r="12" fill="#1DB954" />}
+      {!mono && <circle cx="12" cy="12" r="12" fill={muted ? '#49515d' : '#1DB954'} />}
       <g
         fill="none"
         stroke={mono ? 'currentColor' : '#ffffff'}

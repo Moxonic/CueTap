@@ -14,6 +14,9 @@ import {
   redirectUri,
   redirectUriProblem,
   setClientId,
+  subscribeAuth,
+  isValidClientId,
+  normaliseClientId,
 } from '../spotify/auth'
 import SpotifyMark from '../components/SpotifyMark'
 import { currentUser } from '../spotify/api'
@@ -206,6 +209,9 @@ function SpotifySection() {
   const [copied, setCopied] = useState(false)
   const uri = redirectUri()
   const problem = redirectUriProblem()
+  const idOk = isValidClientId(clientId)
+
+  useEffect(() => subscribeAuth(() => setConnected(isConnected())), [])
 
   useEffect(() => {
     if (!connected) {
@@ -230,71 +236,107 @@ function SpotifySection() {
       .catch(() => setError(`Copy failed. The redirect URI is: ${uri}`))
   }
 
+  if (connected) {
+    return (
+      <Field
+        label="Spotify"
+        icon={<SpotifyMark size={16} />}
+        hint={account ? `${account.name} · ${account.product}` : 'connected'}
+      >
+        {account && account.product !== 'premium' && (
+          <div className="warn">
+            This account is <b>{account.product}</b>. The Spotify player needs Premium — cues will
+            fail to start without it.
+          </div>
+        )}
+        <button
+          onClick={() => {
+            spotify.teardown()
+            disconnect()
+          }}
+        >
+          Disconnect Spotify
+        </button>
+      </Field>
+    )
+  }
+
+  // Spotify has no public client, so an app registration is unavoidable. The
+  // best that can be done is to put each action next to the step that needs it
+  // and validate as we go, rather than describing seven things in a paragraph.
   return (
-    <Field
-      label="Spotify"
-      icon={<SpotifyMark size={16} />}
-      hint={connected ? (account ? `${account.name} · ${account.product}` : 'connected') : 'not connected'}
-    >
-      {connected ? (
-        <>
-          {account && account.product !== 'premium' && (
-            <div className="warn">
-              This account is <b>{account.product}</b>. The Spotify player needs Premium — cues will
-              fail to start without it.
-            </div>
-          )}
-          <button
-            onClick={() => {
-              spotify.teardown()
-              disconnect()
-              setConnected(false)
-            }}
+    <Field label="Spotify" icon={<SpotifyMark size={16} muted />} hint="not connected">
+      <ol className="steps">
+        <li>
+          <span className="step-title">Create a free Spotify app</span>
+          <a
+            className="step-action"
+            href="https://developer.spotify.com/dashboard"
+            target="_blank"
+            rel="noreferrer noopener"
           >
-            Disconnect Spotify
-          </button>
-        </>
-      ) : (
-        <>
-          {problem && (
+            Open the Spotify dashboard ↗
+          </a>
+        </li>
+
+        <li>
+          <span className="step-title">Add this redirect URI to it</span>
+          {problem ? (
             <div className="warn">
-              <b>Spotify will reject this address.</b> {problem}
+              <b>This address will not work.</b> {problem}
               <button className="linkish" onClick={() => window.location.assign(loopbackAlternative())}>
                 Reopen on 127.0.0.1
               </button>
-              <small>
-                That is a different origin, so you will need to enter the Client ID again there.
-              </small>
+              <small>A different origin, so the Client ID is entered again there.</small>
             </div>
+          ) : (
+            <button className="step-action copy-uri" onClick={copyUri}>
+              {copied ? '✓ Copied' : `Copy ${uri}`}
+            </button>
           )}
+        </li>
+
+        <li>
+          <span className="step-title">Paste its Client ID</span>
           <input
             className="name-input"
             value={clientId}
+            // Normalise on paste and on blur, never per keystroke: extracting a
+            // 32-hex run from a half-typed value feeds on its own output and
+            // corrupts an ID that is being typed by hand.
             onChange={(e) => setClientIdState(e.target.value)}
-            placeholder="Spotify Client ID"
+            onPaste={(e) => {
+              const text = e.clipboardData.getData('text')
+              if (/[0-9a-f]{32}/i.test(text)) {
+                e.preventDefault()
+                setClientIdState(normaliseClientId(text))
+              }
+            }}
+            onBlur={() => setClientIdState((v) => normaliseClientId(v))}
+            placeholder="32 letters and numbers"
             autoComplete="off"
             spellCheck={false}
+            inputMode="text"
           />
-          <button className="linkish copy-uri" disabled={!!problem} onClick={copyUri}>
-            {copied ? 'Copied' : `Copy redirect URI: ${uri}`}
-          </button>
-          <button className="primary" disabled={!clientId.trim() || !!problem} onClick={connect}>
-            Connect Spotify
-          </button>
-          <div className="note">
-            <p>
-              Create a free app at <b>developer.spotify.com/dashboard</b>, add the redirect URI
-              above to it exactly as shown, then paste its Client ID here. Playback requires a
-              Spotify <b>Premium</b> account.
-            </p>
-            <p>
-              Spotify no longer accepts <b>localhost</b> or plain HTTP — the address must be HTTPS,
-              or the literal <b>127.0.0.1</b>. Every address you run CueTap on is a separate
-              redirect URI and each one has to be registered.
-            </p>
-          </div>
-        </>
-      )}
+          {clientId.length > 0 && !idOk && (
+            <small className="step-warn">
+              That does not look like a Client ID — it is 32 letters and numbers, from the app page
+              on the dashboard.
+            </small>
+          )}
+        </li>
+      </ol>
+
+      <button className="primary" disabled={!idOk || !!problem} onClick={connect}>
+        Connect Spotify
+      </button>
+
+      <div className="note">
+        <p>
+          Playback needs Spotify <b>Premium</b>. A new dashboard app starts in development mode,
+          which is fine — you are already on its allowlist as its owner.
+        </p>
+      </div>
     </Field>
   )
 }

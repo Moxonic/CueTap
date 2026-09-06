@@ -95,6 +95,16 @@ function readToken(): StoredToken | null {
   }
 }
 
+/** Anything showing connection state (the header icon) re-reads on change. */
+const authListeners = new Set<() => void>()
+
+export function subscribeAuth(fn: () => void): () => void {
+  authListeners.add(fn)
+  return () => {
+    authListeners.delete(fn)
+  }
+}
+
 function writeToken(t: StoredToken | null): void {
   try {
     if (t) localStorage.setItem(STORE_KEY, JSON.stringify(t))
@@ -102,6 +112,7 @@ function writeToken(t: StoredToken | null): void {
   } catch {
     /* private mode */
   }
+  for (const fn of authListeners) fn()
 }
 
 export function isConnected(): boolean {
@@ -247,4 +258,18 @@ export async function getAccessToken(): Promise<string> {
   } finally {
     refreshing = null
   }
+}
+
+/**
+ * Pull a Client ID out of whatever got pasted. People paste "Client ID" plus a
+ * newline, or with trailing whitespace from the dashboard; a 32-hex run is
+ * unambiguous, so find it rather than making them clean it up by hand.
+ */
+export function normaliseClientId(raw: string): string {
+  const match = raw.match(/[0-9a-f]{32}/i)
+  return match ? match[0].toLowerCase() : raw.trim()
+}
+
+export function isValidClientId(id: string): boolean {
+  return /^[0-9a-f]{32}$/i.test(id.trim())
 }

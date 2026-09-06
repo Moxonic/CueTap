@@ -9,9 +9,10 @@ import Recorder from './views/Recorder'
 import Settings from './views/Settings'
 import ArmScreen from './views/ArmScreen'
 import SpotifySearch from './views/SpotifySearch'
-import { completeLoginFromRedirect } from './spotify/auth'
+import { completeLoginFromRedirect, isConnected, subscribeAuth } from './spotify/auth'
 import Transport from './components/Transport'
 import SpotifyMark from './components/SpotifyMark'
+import RecordMark from './components/RecordMark'
 
 export type ViewMode = 'pads' | 'list'
 
@@ -23,8 +24,11 @@ export default function App() {
   const [editing, setEditing] = useState<string | null>(null)
   const [overlay, setOverlay] = useState<'none' | 'recorder' | 'settings' | 'spotify'>('none')
   const fileInput = useRef<HTMLInputElement>(null)
+  const [spotifyOn, setSpotifyOn] = useState(isConnected())
 
   const { show, error, setError, go, stopAll, panic, importFiles } = store
+
+  useEffect(() => subscribeAuth(() => setSpotifyOn(isConnected())), [])
 
   // Spotify sends the browser back here with ?code=...; consume it once on load.
   useEffect(() => {
@@ -99,14 +103,15 @@ export default function App() {
             ＋
           </button>
           <button
-            className="icon spotify"
+            className={`icon spotify${spotifyOn ? '' : ' muted'}`}
             onClick={() => setOverlay('spotify')}
-            aria-label="Add from Spotify"
+            aria-label={spotifyOn ? 'Add from Spotify' : 'Add from Spotify — not connected'}
+            title={spotifyOn ? 'Add from Spotify' : 'Spotify is not connected'}
           >
-            <SpotifyMark size={20} />
+            <SpotifyMark size={20} muted={!spotifyOn} />
           </button>
-          <button className="icon" onClick={() => setOverlay('recorder')} aria-label="Record">
-            ●
+          <button className="icon record" onClick={() => setOverlay('recorder')} aria-label="Record">
+            <RecordMark size={20} />
           </button>
           <button className="icon" onClick={() => setOverlay('settings')} aria-label="Settings">
             ⚙
