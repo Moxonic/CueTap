@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { formatClock } from '../lib/format'
 
 interface Props {
   peaks: number[]
@@ -15,6 +16,73 @@ interface Props {
 
 /** Smallest usable selection, so the handles can never cross. */
 const MIN_SPAN = 0.05
+
+/** Tick spacings that read as round numbers of seconds or minutes. */
+const TICK_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600]
+
+/** The coarsest step that still puts roughly six labels across the strip. */
+function tickStep(duration: number, width: number): number {
+  const target = duration / Math.max(2, Math.min(8, Math.floor(width / 64)))
+  return TICK_STEPS.find((s) => s >= target) ?? TICK_STEPS[TICK_STEPS.length - 1]
+}
+
+interface TimelineOpts {
+  width: number
+  h: number
+  duration: number
+  inX: number
+  outX: number
+  color: string
+  /** seconds, or null when the cue is not sounding */
+  position: number | null
+}
+
+/**
+ * The stand-in for a waveform on a streaming cue: a ruled band that shows the
+ * selection, how far through the track the playhead is, and where the minutes
+ * fall. Everything here is information the app genuinely has.
+ */
+function drawTimeline(ctx: CanvasRenderingContext2D, o: TimelineOpts): void {
+  const { width, h, duration, inX, outX, color, position } = o
+  const bandH = Math.max(10, Math.round(h * 0.42))
+  const bandY = Math.round((h - bandH) / 2)
+
+  // The full track, then the selected span picked out in the cue's colour.
+  ctx.fillStyle = 'rgba(255,255,255,0.10)'
+  ctx.fillRect(0, bandY, width, bandH)
+  ctx.fillStyle = color
+  ctx.globalAlpha = 0.32
+  ctx.fillRect(inX, bandY, Math.max(0, outX - inX), bandH)
+  ctx.globalAlpha = 1
+
+  // Elapsed fill. Without a waveform this is the only cue to how far in you are,
+  // so it carries more weight here than the playhead line does on a file cue.
+  if (position !== null) {
+    const px = Math.max(inX, Math.min(outX, (position / duration) * width))
+    ctx.fillStyle = color
+    ctx.globalAlpha = 0.85
+    ctx.fillRect(inX, bandY, Math.max(0, px - inX), bandH)
+    ctx.globalAlpha = 1
+  }
+
+  // Minute ruler, so a trim point can be judged against the clock.
+  const step = tickStep(duration, width)
+  ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace'
+  ctx.textBaseline = 'top'
+  for (let t = step; t < duration; t += step) {
+    const x = Math.round((t / duration) * width) + 0.5
+    ctx.fillStyle = 'rgba(255,255,255,0.22)'
+    ctx.fillRect(x, bandY - 5, 1, bandH + 10)
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'
+    ctx.fillText(formatClock(t), x + 3, bandY + bandH + 7)
+  }
+
+  // Track length at the tail, right-aligned so it never collides with a tick.
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.textAlign = 'right'
+  ctx.fillText(formatClock(duration), width - 4, bandY - 17)
+  ctx.textAlign = 'left'
+}
 
 export default function Waveform({
   peaks,
@@ -57,17 +125,31 @@ export default function Waveform({
     const inX = (inPoint / duration) * width
     const outX = (outPoint / duration) * width
 
-    // Streaming cues expose no waveform data. Draw an honest flat band rather
-    // than a synthetic shape that would imply detail the app does not have.
+    // Streaming cues expose no waveform data: Spotify decodes in a protected
+    // pipeline, and the Audio Analysis endpoint that once carried a loudness
+    // envelope is closed to apps registered since November 2024. So there is no
+    // amplitude to draw, and inventing a shape would imply detail the app does
+    // not have. Draw a timeline instead — the thing trimming actually needs is
+    // where you are in the track, not what it looks like.
     const flat = peaks.length === 0
-    for (let x = 0; x < width; x++) {
-      const peak = flat ? 0.34 : (peaks[Math.floor((x / width) * peaks.length)] ?? 0)
-      const bar = Math.max(1, peak * (h * 0.86))
-      const inside = x >= inX && x <= outX
-      ctx.fillStyle = inside ? color : 'rgba(255,255,255,0.13)'
-      ctx.globalAlpha = flat ? 0.45 : 1
-      ctx.fillRect(x, mid - bar / 2, 1, bar)
-      ctx.globalAlpha = 1
+    if (flat) {
+      drawTimeline(ctx, {
+        width,
+        h,
+        duration,
+        inX,
+        outX,
+        color,
+        position,
+      })
+    } else {
+      for (let x = 0; x < width; x++) {
+        const peak = peaks[Math.floor((x / width) * peaks.length)] ?? 0
+        const bar = Math.max(1, peak * (h * 0.86))
+        const inside = x >= inX && x <= outX
+        ctx.fillStyle = inside ? color : 'rgba(255,255,255,0.13)'
+        ctx.fillRect(x, mid - bar / 2, 1, bar)
+      }
     }
 
     // Trimmed-away regions get knocked back further.
@@ -95,7 +177,9 @@ export default function Waveform({
       if (fo > 0) ctx.lineTo(outX, h - 2)
       ctx.stroke()
     }
-  }, [peaks, duration, inPoint, outPoint, fadeIn, fadeOut, color, width])
+    // `position` only participates for streaming cues, where it drives the
+    // elapsed fill; file cues get their playhead from the DOM element below.
+  }, [peaks, duration, inPoint, outPoint, fadeIn, fadeOut, color, width, position])
 
   const timeAt = useCallback(
     (clientX: number): number => {

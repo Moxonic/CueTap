@@ -3,6 +3,7 @@ import { Field } from '../components/controls'
 import SpotifyMark from '../components/SpotifyMark'
 import { useStore } from '../data/store'
 import { currentUser, diagnose, type Diagnosis } from '../spotify/api'
+import { drmProblem } from '../spotify/drm'
 import { spotify } from '../spotify/player'
 import {
   beginLogin,
@@ -27,9 +28,17 @@ export function SpotifySetup() {
   const { setError } = useStore()
   const [clientId, setClientIdState] = useState(getClientId())
   const [copied, setCopied] = useState(false)
+  const [drm, setDrm] = useState<string | null>(null)
   const uri = redirectUri()
   const problem = redirectUriProblem()
   const idOk = isValidClientId(clientId)
+
+  // Check the browser before any of the setup work, not after it: registering a
+  // dashboard app and connecting an account are several minutes that are wasted
+  // if this browser could never have played the audio.
+  useEffect(() => {
+    void drmProblem().then(setDrm)
+  }, [])
 
   const connect = () => {
     setClientId(clientId)
@@ -48,6 +57,20 @@ export function SpotifySetup() {
 
   return (
     <>
+      {drm ? (
+        <div className="warn">
+          <b>This browser cannot play Spotify.</b> {drm}
+        </div>
+      ) : (
+        <div className="note">
+          <p>
+            Use <b>Chrome or Edge</b>. Spotify audio is DRM-protected, so it will not play in an
+            embedded browser — VS Code's Simple Browser, an IDE preview pane, an in-app webview —
+            and Safari cannot play it at all.
+          </p>
+        </div>
+      )}
+
       <ol className="steps">
         <li>
           <span className="step-title">Create a free Spotify app</span>

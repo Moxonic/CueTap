@@ -109,6 +109,13 @@ A cue can play a Spotify track instead of a local file. Open it from **＋ → S
 an account, the search box, and the "Test connection" diagnostic all live in that one window,
 rather than being split off into Settings.
 
+> **Use Chrome or Edge.** Spotify audio is DRM-protected and decodes through Widevine, so it will
+> not play in an embedded browser — VS Code's Simple Browser, an IDE preview pane, any in-app
+> webview — and Safari cannot play it at all, as it uses FairPlay. Firefox needs *Play
+> DRM-controlled content* switched on. Without a CDM the Spotify SDK dies with `No supported
+> keysystem was found`; CueTap checks for this before setup rather than after several minutes of
+> it. File cues and search are unaffected.
+
 The first time, the same window walks you through setup:
 
 1. Create a free app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
@@ -137,6 +144,7 @@ the difference is real:
 | Volume | GainNode | `setVolume()` |
 | Fade in / out | Equal-power, sample-accurate | Stepped on a 50 ms timer |
 | Trim in / out | Sample-accurate | `seek()`, roughly 100 ms |
+| Trim display | Real waveform peaks | Ruled timeline — no amplitude exists to draw |
 | Seamless loop | Zero gap, no drift | Seeks back — short audible gap each pass |
 | Crossfade loop | Yes | Not possible — there is only one player |
 | Layering | Unlimited | One Spotify cue at a time |
@@ -145,6 +153,13 @@ the difference is real:
 
 The editor hides the controls a Spotify cue cannot honour rather than letting you set something
 that will not be heard.
+
+**There is no waveform for a Spotify track, and there cannot be.** The audio never reaches an
+`AudioContext`, and the Audio Analysis endpoint that used to expose a loudness envelope was
+[closed to newly registered apps in November 2024](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api),
+along with Audio Features and the 30-second preview URLs. Rather than invent a shape, the trim
+strip becomes a ruled timeline: the selected span in the cue's colour, minute ticks, and an
+elapsed fill that tracks the playhead while the cue runs. Everything it shows is real.
 
 **Use Spotify cues for preshow, interval and playoff music.** Use a local file for anything that
 has to land on a visual cue — a doorbell or a thunder crack triggered over the network will arrive
