@@ -39,9 +39,11 @@ export function drmProblem(): Promise<string | null> {
     }
     return (
       'This browser has no Widevine DRM, which Spotify playback requires. ' +
-      'Use Chrome or Edge; in Firefox turn on "Play DRM-controlled content"; ' +
-      'on Chrome check chrome://components for the Widevine module. ' +
-      'Search still works without it.'
+      'Embedded browsers — VS Code\'s Simple Browser, an IDE preview pane, most ' +
+      'in-app webviews — never have it: open CueTap in a real Chrome or Edge ' +
+      'window instead. In Firefox turn on "Play DRM-controlled content"; on ' +
+      'Chrome check chrome://components for the Widevine module. ' +
+      'Search and local file cues work without it.'
     )
   })()
   return cached
