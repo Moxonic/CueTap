@@ -6,6 +6,7 @@
   "description": "Phone-based sound cue playback for small theaters and rehearsals.",
   "scripts": {
     "dev": "vite",
+    "dev:phone": "node scripts/dev-phone.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "icons": "node scripts/gen-icons.mjs",

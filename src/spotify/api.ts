@@ -28,6 +28,10 @@ export async function describeError(res: Response): Promise<string> {
   }
   const suffix = detail ? ` — ${detail}` : ''
 
+  // Also log it: a raw "Failed to load resource: 400" in the console says
+  // nothing, and the console is where people look first.
+  console.error(`[CueTap] Spotify ${res.status} on ${res.url}: ${detail || '(no message in body)'}`)
+
   switch (res.status) {
     case 400:
       return (

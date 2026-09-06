@@ -3,14 +3,28 @@ import react from '@vitejs/plugin-react'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// HTTPS is not optional here: getUserMedia (the recorder) and service worker
-// registration are both blocked on a plain http:// LAN address, which is exactly
-// how you reach the dev server from a phone. basicSsl issues a self-signed cert —
-// the phone will warn once, then remember it.
+/**
+ * HTTPS is opt-in: `HTTPS=1 npm run dev`.
+ *
+ * A phone on the LAN needs it, because getUserMedia and service workers require
+ * a secure context and a LAN IP is not one. But loopback *is* a secure context,
+ * so plain http://127.0.0.1 gets both for free — and avoids two problems the
+ * self-signed cert causes:
+ *
+ *  - Chrome refuses to register a service worker over an untrusted certificate
+ *    even after you click through the warning, so the PWA never installs.
+ *  - Spotify rejects `localhost` outright and wants an explicit loopback
+ *    literal, which http://127.0.0.1:5173 satisfies exactly.
+ *
+ * So: plain HTTP on loopback for desktop work, HTTPS only when testing on a
+ * real phone.
+ */
+const useHttps = process.env.HTTPS === '1' || process.env.HTTPS === 'true'
+
 export default defineConfig({
   plugins: [
     react(),
-    basicSsl(),
+    ...(useHttps ? [basicSsl()] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/apple-touch-icon.png'],

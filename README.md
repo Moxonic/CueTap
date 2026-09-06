@@ -46,14 +46,23 @@ rail on the right, where GO becomes a tall thumb target:
 
 ```bash
 npm install
-npm run dev       # serves on https://localhost:5173 and a https:// LAN address
+npm run dev         # http://127.0.0.1:5173  — for working on a computer
+npm run dev:phone   # https:// on your LAN   — for testing on a real phone
 ```
 
-Open the **`https://`** LAN address the dev server prints on your phone and accept the
-self-signed certificate warning once.
+**On a computer, use `npm run dev` and open `http://127.0.0.1:5173`.** Loopback counts as a secure
+context, so the microphone, the service worker and storage persistence all work over plain HTTP —
+and `http://127.0.0.1:5173` is a redirect URI Spotify accepts. Do not use `localhost`: Spotify
+rejects that hostname outright.
 
-> **HTTPS is not optional.** On a plain `http://192.168.x.x` address the browser blocks both the
-> microphone and the service worker, so recording and offline support silently stop working.
+**To test on a phone, use `npm run dev:phone`** and open the `https://` LAN address it prints,
+accepting the self-signed certificate once. A LAN IP is not a secure context, so the phone needs
+TLS for the recorder to work at all.
+
+> One caveat in phone mode: Chrome will not register a service worker over a self-signed
+> certificate, even after you accept the warning, so offline support and installing to the home
+> screen cannot be tested that way. For those, build and host `dist/` somewhere with a real
+> certificate.
 
 Then **Add to Home Screen** and launch it from the icon. Installed, it runs full screen, works
 with no network, and is far more likely to be granted persistent storage — which is what stops
@@ -223,7 +232,8 @@ Built with Vite, React and TypeScript. Roughly 60 KB gzipped.
 
 | Command | Does |
 | --- | --- |
-| `npm run dev` | Dev server over HTTPS, on localhost and the LAN |
+| `npm run dev` | Dev server on http://127.0.0.1:5173 (loopback is a secure context) |
+| `npm run dev:phone` | Dev server over HTTPS on the LAN, for testing on a real phone |
 | `npm run build` | Typecheck and produce `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run icons` | Regenerate the PWA icons (already committed) |
