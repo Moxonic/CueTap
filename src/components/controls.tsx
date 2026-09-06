@@ -1,10 +1,23 @@
 import type { ReactNode } from 'react'
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  icon,
+  children,
+}: {
+  label: string
+  hint?: string
+  icon?: ReactNode
+  children: ReactNode
+}) {
   return (
     <div className="field">
       <div className="field-head">
-        <label>{label}</label>
+        <label>
+          {icon}
+          {label}
+        </label>
         {hint && <span className="hint">{hint}</span>}
       </div>
       {children}

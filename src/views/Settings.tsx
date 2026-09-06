@@ -5,7 +5,17 @@ import { requestPersistence, storageEstimate } from '../data/db'
 import { useStore } from '../data/store'
 import { formatBytes, formatDb, dbToGain, gainToDb } from '../lib/format'
 import type { PadTrigger } from '../data/types'
-import { beginLogin, disconnect, getClientId, isConnected, redirectUri, setClientId } from '../spotify/auth'
+import {
+  beginLogin,
+  disconnect,
+  getClientId,
+  isConnected,
+  loopbackAlternative,
+  redirectUri,
+  redirectUriProblem,
+  setClientId,
+} from '../spotify/auth'
+import SpotifyMark from '../components/SpotifyMark'
 import { currentUser } from '../spotify/api'
 import { spotify } from '../spotify/player'
 
@@ -195,6 +205,7 @@ function SpotifySection() {
   const [account, setAccount] = useState<{ name: string; product: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const uri = redirectUri()
+  const problem = redirectUriProblem()
 
   useEffect(() => {
     if (!connected) {
@@ -222,6 +233,7 @@ function SpotifySection() {
   return (
     <Field
       label="Spotify"
+      icon={<SpotifyMark size={16} />}
       hint={connected ? (account ? `${account.name} · ${account.product}` : 'connected') : 'not connected'}
     >
       {connected ? (
@@ -244,6 +256,17 @@ function SpotifySection() {
         </>
       ) : (
         <>
+          {problem && (
+            <div className="warn">
+              <b>Spotify will reject this address.</b> {problem}
+              <button className="linkish" onClick={() => window.location.assign(loopbackAlternative())}>
+                Reopen on 127.0.0.1
+              </button>
+              <small>
+                That is a different origin, so you will need to enter the Client ID again there.
+              </small>
+            </div>
+          )}
           <input
             className="name-input"
             value={clientId}
@@ -252,10 +275,10 @@ function SpotifySection() {
             autoComplete="off"
             spellCheck={false}
           />
-          <button className="linkish copy-uri" onClick={copyUri}>
+          <button className="linkish copy-uri" disabled={!!problem} onClick={copyUri}>
             {copied ? 'Copied' : `Copy redirect URI: ${uri}`}
           </button>
-          <button className="primary" disabled={!clientId.trim()} onClick={connect}>
+          <button className="primary" disabled={!clientId.trim() || !!problem} onClick={connect}>
             Connect Spotify
           </button>
           <div className="note">
@@ -263,6 +286,11 @@ function SpotifySection() {
               Create a free app at <b>developer.spotify.com/dashboard</b>, add the redirect URI
               above to it exactly as shown, then paste its Client ID here. Playback requires a
               Spotify <b>Premium</b> account.
+            </p>
+            <p>
+              Spotify no longer accepts <b>localhost</b> or plain HTTP — the address must be HTTPS,
+              or the literal <b>127.0.0.1</b>. Every address you run CueTap on is a separate
+              redirect URI and each one has to be registered.
             </p>
           </div>
         </>

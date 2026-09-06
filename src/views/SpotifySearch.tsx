@@ -4,6 +4,7 @@ import { useStore } from '../data/store'
 import { searchTracks, type TrackHit } from '../spotify/api'
 import { isConnected } from '../spotify/auth'
 import { formatClock } from '../lib/format'
+import SpotifyMark from '../components/SpotifyMark'
 
 export default function SpotifySearch({
   onClose,
@@ -63,6 +64,10 @@ export default function SpotifySearch({
   if (!connected) {
     return (
       <Sheet title="Add from Spotify" onClose={onClose}>
+        <div className="stream-banner">
+          <SpotifyMark size={18} />
+          <span>Not connected</span>
+        </div>
         <div className="note">
           <p>
             <b>Not connected to Spotify.</b> Connect your account in Settings first — it needs a

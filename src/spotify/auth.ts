@@ -56,6 +56,36 @@ export function redirectUri(): string {
   return window.location.origin + window.location.pathname.replace(/\/$/, '') + '/'
 }
 
+/**
+ * Why Spotify would reject the current address, or null if it is acceptable.
+ *
+ * Since April 2025 Spotify requires HTTPS, or an explicit loopback IP literal
+ * over HTTP. The hostname `localhost` is rejected outright — even over HTTPS —
+ * which produces a bare "INVALID_CLIENT: Invalid redirect URI" 400 on their
+ * consent page with nothing to explain it. Catching it here turns that into an
+ * answer instead of a dead end.
+ */
+export function redirectUriProblem(): string | null {
+  const { protocol, hostname } = window.location
+  const loopback = hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
+
+  if (hostname === 'localhost') {
+    return 'Spotify rejects "localhost" as a redirect URI, even over HTTPS. Reopen CueTap on 127.0.0.1 instead.'
+  }
+  if (protocol !== 'https:' && !loopback) {
+    return 'Spotify requires HTTPS, or the literal loopback address 127.0.0.1. This page is plain HTTP.'
+  }
+  return null
+}
+
+/** The same address with localhost swapped for the loopback literal. */
+export function loopbackAlternative(): string {
+  const u = new URL(window.location.href)
+  u.hostname = '127.0.0.1'
+  u.search = ''
+  return u.toString()
+}
+
 function readToken(): StoredToken | null {
   try {
     const raw = localStorage.getItem(STORE_KEY)
@@ -100,6 +130,11 @@ async function challengeFrom(verifier: string): Promise<string> {
 export async function beginLogin(): Promise<void> {
   const clientId = getClientId()
   if (!clientId) throw new Error('Set your Spotify Client ID first.')
+
+  // Fail here with a reason rather than bouncing the user to Spotify's own
+  // unexplained 400 page.
+  const problem = redirectUriProblem()
+  if (problem) throw new Error(problem)
 
   const verifier = randomString(48)
   try {

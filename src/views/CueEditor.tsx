@@ -1,6 +1,7 @@
 import { useTransport } from '../audio/useTransport'
 import { Field, Segmented, Sheet, Slider } from '../components/controls'
 import Waveform from '../components/Waveform'
+import SpotifyMark from '../components/SpotifyMark'
 import { useStore } from '../data/store'
 import { formatDb, formatTime, dbToGain, gainToDb } from '../lib/format'
 import {
@@ -45,7 +46,7 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
     >
       {stream && (
         <div className="stream-banner">
-          <span className="tag spotify">Spotify</span>
+          <SpotifyMark size={18} />
           <span>
             {cue.spotify?.title} — {cue.spotify?.artist}
           </span>

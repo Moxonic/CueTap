@@ -11,6 +11,7 @@ import ArmScreen from './views/ArmScreen'
 import SpotifySearch from './views/SpotifySearch'
 import { completeLoginFromRedirect } from './spotify/auth'
 import Transport from './components/Transport'
+import SpotifyMark from './components/SpotifyMark'
 
 export type ViewMode = 'pads' | 'list'
 
@@ -102,7 +103,7 @@ export default function App() {
             onClick={() => setOverlay('spotify')}
             aria-label="Add from Spotify"
           >
-            ♫
+            <SpotifyMark size={20} />
           </button>
           <button className="icon" onClick={() => setOverlay('recorder')} aria-label="Record">
             ●

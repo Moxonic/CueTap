@@ -211,13 +211,27 @@ export default function Recorder({ onClose }: { onClose: () => void }) {
 
       <div className="rec-time">{formatClock(elapsed)}</div>
 
-      <button
-        className={`rec-button${recording ? ' on' : ''}`}
-        onClick={() => (recording ? stop() : start())}
-        disabled={saving || !armed}
-      >
-        {saving ? 'Saving…' : recording ? 'Stop and save' : armed ? 'Start recording' : 'Arming input…'}
-      </button>
+      <div className="rec-controls">
+        <button
+          className={`rec-button${recording ? ' on' : ''}`}
+          onClick={() => (recording ? stop() : start())}
+          disabled={saving || !armed}
+          aria-label={recording ? 'Stop and save recording' : 'Start recording'}
+        >
+          {/* Circle when idle, rounded square while recording — the shape itself
+              says what the next tap does, so the label never has to be read. */}
+          <span className="rec-shape" />
+        </button>
+        <span className="rec-label">
+          {saving
+            ? 'Saving…'
+            : recording
+              ? 'Recording — tap to stop and save'
+              : armed
+                ? 'Tap to record'
+                : 'Arming input…'}
+        </span>
+      </div>
 
       <div className="note">
         <p>

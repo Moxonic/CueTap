@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { Transport } from '../audio/useTransport'
 import { useStore } from '../data/store'
 import { formatClock } from '../lib/format'
+import SpotifyMark from '../components/SpotifyMark'
 import { isStream, type Cue } from '../data/types'
 
 const LONG_PRESS_MS = 450
@@ -106,7 +107,11 @@ function Pad({
           </>
         ) : (
           <>
-            {isStream(cue) && <em className="tag spotify">spotify</em>}
+            {isStream(cue) && (
+              <em className="tag spotify">
+                <SpotifyMark size={11} mono />
+              </em>
+            )}
             {cue.loop !== 'off' && <em className="tag">loop</em>}
             {cue.followAction !== 'none' && <em className="tag">follow</em>}
             {formatClock(cue.outPoint - cue.inPoint)}

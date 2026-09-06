@@ -92,10 +92,16 @@ stops everything.
 A cue can play a Spotify track instead of a local file. Set it up in **Settings → Spotify**:
 
 1. Create a free app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
-2. Add the redirect URI that Settings shows you, **exactly** as shown — a mismatch here is the
-   single most common reason the login fails. Each address you run CueTap on (localhost, your LAN
-   address, a hosted build) is a separate URI and all of them need registering.
+2. Add the redirect URI that Settings shows you, **exactly** as shown. Each address you run CueTap
+   on (your dev machine, your LAN address, a hosted build) is a separate URI and all of them need
+   registering.
 3. Paste the Client ID into Settings and connect.
+
+> **`localhost` will not work.** Since April 2025 Spotify requires HTTPS, or an explicit loopback
+> literal — [`localhost` is rejected outright](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri),
+> even over HTTPS, and gives you a bare `INVALID_CLIENT: Invalid redirect URI` 400 with no
+> explanation. For local development open CueTap on **`http://127.0.0.1:5173`** instead. Settings
+> detects this and refuses to start a login it knows Spotify will reject.
 
 Playback requires **Spotify Premium** — the Web Playback SDK refuses to start on a free account.
 The Client ID lives in your browser rather than in this repo, so every deployment brings its own.
