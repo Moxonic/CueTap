@@ -221,25 +221,8 @@ export default function Recorder({ onClose }: { onClose: () => void }) {
 
       <div className="note">
         <p>
-          <b>Recording Spotify, YouTube or Apple Music from this same phone.</b> Those apps block
-          direct capture of their audio stream at the operating-system level, and no web app on any
-          phone can read it. What does work is capturing the sound after it leaves the app:
-        </p>
-        <p>
-          <b>1. Line loopback — the good one.</b> Plug in a USB-C audio interface and patch its
-          output back into its input, then pick it in <b>Input</b> above. The phone plays the track
-          out and records it back at line level, so you get a clean stereo copy with no room noise.
-        </p>
-        <p>
-          <b>2. Speaker to microphone — the quick one.</b> Start playback, come back here, and
-          record the built-in mic while the track plays out loud. It works on any phone with no
-          extra hardware, but you get mono, room reflections and whatever else the room is doing.
-        </p>
-        <p>
-          <b>On iPhone, start playback first.</b> Safari suspends audio the moment it is
-          backgrounded, so you cannot leave CueTap to hit play mid-take. Opening the input here may
-          also duck or stop the other app — watch the meter for a second before recording to see
-          whether the track is still coming through.
+          Record voice cues, announcements, or anything in the room. Plug in a USB-C audio
+          interface and it appears under <b>Input</b> above, at line level and in stereo.
         </p>
         <p>
           Aim for peaks around 70–90%. Auto gain is off so the recording keeps its dynamics, which

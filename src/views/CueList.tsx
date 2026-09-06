@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Transport } from '../audio/useTransport'
 import { useStore } from '../data/store'
 import { formatClock } from '../lib/format'
+import { isStream } from '../data/types'
 
 export default function CueList({
   transport,
@@ -62,6 +63,7 @@ export default function CueList({
             <button className="row-main" onClick={() => setStandby(i)}>
               <span className="row-name">{cue.name}</span>
               <span className="row-meta">
+                {isStream(cue) && <em className="tag spotify">spotify</em>}
                 {cue.loop !== 'off' && <em className="tag">{cue.loop === 'seamless' ? 'loop' : 'loop×'}</em>}
                 {cue.fadeIn > 0 && <em className="tag">↗{cue.fadeIn}s</em>}
                 {cue.fadeOut > 0 && <em className="tag">↘{cue.fadeOut}s</em>}

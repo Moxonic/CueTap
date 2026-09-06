@@ -8,6 +8,8 @@ import CueEditor from './views/CueEditor'
 import Recorder from './views/Recorder'
 import Settings from './views/Settings'
 import ArmScreen from './views/ArmScreen'
+import SpotifySearch from './views/SpotifySearch'
+import { completeLoginFromRedirect } from './spotify/auth'
 import Transport from './components/Transport'
 
 export type ViewMode = 'pads' | 'list'
@@ -18,10 +20,17 @@ export default function App() {
   const [armed, setArmed] = useState(false)
   const [view, setView] = useState<ViewMode>('list')
   const [editing, setEditing] = useState<string | null>(null)
-  const [overlay, setOverlay] = useState<'none' | 'recorder' | 'settings'>('none')
+  const [overlay, setOverlay] = useState<'none' | 'recorder' | 'settings' | 'spotify'>('none')
   const fileInput = useRef<HTMLInputElement>(null)
 
   const { show, error, setError, go, stopAll, panic, importFiles } = store
+
+  // Spotify sends the browser back here with ?code=...; consume it once on load.
+  useEffect(() => {
+    completeLoginFromRedirect().catch((e: unknown) =>
+      setError(e instanceof Error ? e.message : String(e)),
+    )
+  }, [setError])
 
   const arm = useCallback(async () => {
     await engine.unlock()
@@ -88,6 +97,13 @@ export default function App() {
           <button className="icon" onClick={() => fileInput.current?.click()} aria-label="Add audio files">
             ＋
           </button>
+          <button
+            className="icon spotify"
+            onClick={() => setOverlay('spotify')}
+            aria-label="Add from Spotify"
+          >
+            ♫
+          </button>
           <button className="icon" onClick={() => setOverlay('recorder')} aria-label="Record">
             ●
           </button>
@@ -112,7 +128,11 @@ export default function App() {
 
       <main className="stage">
         {show.cues.length === 0 ? (
-          <EmptyState onAdd={() => fileInput.current?.click()} onRecord={() => setOverlay('recorder')} />
+          <EmptyState
+            onAdd={() => fileInput.current?.click()}
+            onRecord={() => setOverlay('recorder')}
+            onSpotify={() => setOverlay('spotify')}
+          />
         ) : view === 'pads' ? (
           <PadGrid transport={transport} onEdit={setEditing} />
         ) : (
@@ -125,6 +145,9 @@ export default function App() {
       {editingCue && <CueEditor cue={editingCue} onClose={() => setEditing(null)} />}
       {overlay === 'recorder' && <Recorder onClose={() => setOverlay('none')} />}
       {overlay === 'settings' && <Settings onClose={() => setOverlay('none')} />}
+      {overlay === 'spotify' && (
+        <SpotifySearch onClose={() => setOverlay('none')} onNeedsSetup={() => setOverlay('settings')} />
+      )}
 
       {error && (
         <div className="toast" role="alert">
@@ -136,7 +159,15 @@ export default function App() {
   )
 }
 
-function EmptyState({ onAdd, onRecord }: { onAdd: () => void; onRecord: () => void }) {
+function EmptyState({
+  onAdd,
+  onRecord,
+  onSpotify,
+}: {
+  onAdd: () => void
+  onRecord: () => void
+  onSpotify: () => void
+}) {
   return (
     <div className="empty">
       <h2>No cues yet</h2>
@@ -148,6 +179,7 @@ function EmptyState({ onAdd, onRecord }: { onAdd: () => void; onRecord: () => vo
         <button className="primary" onClick={onAdd}>
           Add audio files
         </button>
+        <button onClick={onSpotify}>Add from Spotify</button>
         <button onClick={onRecord}>Record something</button>
       </div>
     </div>

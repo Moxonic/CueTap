@@ -1,6 +1,8 @@
 import { Voice } from './voice'
+import { SpotifyVoice } from './spotifyVoice'
+import type { PlayableVoice } from './playable'
 import { loadBuffer, getCached } from './decode'
-import { isExclusive, type Cue, type ShowSettings, type StopMode } from '../data/types'
+import { isExclusive, isStream, type Cue, type ShowSettings, type StopMode } from '../data/types'
 
 /**
  * A one-second silent WAV, used to keep the media session alive in Live mode.
@@ -38,13 +40,16 @@ class Engine {
   ctx: AudioContext | null = null
   private master: GainNode | null = null
   private limiter: DynamicsCompressorNode | null = null
-  private voices = new Set<Voice>()
+  private voices = new Set<PlayableVoice>()
   private listeners = new Set<() => void>()
   private keepAlive: HTMLAudioElement | null = null
   private wakeLock: WakeLockSentinel | null = null
 
   /** Set by the store so a follow-on can resolve "next cue" against the show. */
   onFollow: ((req: FollowRequest) => void) | null = null
+
+  /** Streaming playback fails at runtime (network, Premium, expired token). */
+  onStreamError: ((message: string) => void) | null = null
 
   get ready(): boolean {
     return this.ctx !== null && this.ctx.state === 'running'
@@ -119,7 +124,7 @@ class Engine {
 
   /** Ensure a cue's audio is decoded and in RAM. Cheap if already cached. */
   async prime(cue: Cue): Promise<AudioBuffer | null> {
-    if (!this.ctx) return null
+    if (!this.ctx || isStream(cue)) return null
     try {
       return await loadBuffer(this.ctx, cue.audioId)
     } catch {
@@ -137,34 +142,37 @@ class Engine {
     return false
   }
 
-  voicesFor(cueId: string): Voice[] {
+  voicesFor(cueId: string): PlayableVoice[] {
     return [...this.voices].filter((v) => v.cueId === cueId && !v.stopped)
   }
 
-  activeVoices(): Voice[] {
+  activeVoices(): PlayableVoice[] {
     return [...this.voices].filter((v) => !v.stopped)
   }
 
-  /**
-   * Fire a cue. Returns null if the audio could not be decoded — the caller shows
-   * the error rather than the app failing silently mid-show.
-   */
-  async fire(cue: Cue, settings: ShowSettings): Promise<Voice | null> {
-    if (!this.ctx) return null
-    if (this.ctx.state !== 'running') await this.resume()
+  /** Master gain as a plain number, for players that live outside the audio graph. */
+  private masterLevel(): number {
+    return this.master?.gain.value ?? 1
+  }
 
-    // Prefer the already-decoded buffer so a tap is instant; only await on a miss.
-    const buffer = getCached(cue.audioId) ?? (await this.prime(cue))
-    if (!buffer || !this.master) return null
-
+  /** Release whatever this cue is about to displace, per the show's mode. */
+  private displaceFor(cue: Cue, settings: ShowSettings): void {
     if (isExclusive(cue, settings)) {
       for (const v of this.voices) if (!v.stopped) v.release()
-    } else {
-      // Even in poly mode, one cue should not stack on itself unless asked to.
-      if (settings.padTrigger !== 'stack') for (const v of this.voicesFor(cue.id)) v.release()
+      return
     }
+    // Even in poly mode, one cue should not stack on itself unless asked to.
+    if (settings.padTrigger !== 'stack') {
+      for (const v of this.voicesFor(cue.id)) v.release()
+    }
+    // Spotify has exactly one player, so a second Spotify cue always displaces
+    // the first no matter what the show's layering mode says.
+    if (isStream(cue)) {
+      for (const v of this.voices) if (!v.stopped && isStream(v.cue)) v.release()
+    }
+  }
 
-    const voice = new Voice(this.ctx, cue, buffer, this.master)
+  private register(voice: PlayableVoice): void {
     voice.onEnd = (v) => {
       this.voices.delete(v)
       this.emit()
@@ -173,6 +181,31 @@ class Engine {
     this.voices.add(voice)
     voice.start()
     this.emit()
+  }
+
+  /**
+   * Fire a cue. Returns null if it could not be started — the caller shows the
+   * error rather than the app failing silently mid-show.
+   */
+  async fire(cue: Cue, settings: ShowSettings): Promise<PlayableVoice | null> {
+    if (!this.ctx) return null
+    if (this.ctx.state !== 'running') await this.resume()
+
+    if (isStream(cue)) {
+      if (!cue.spotify) return null
+      this.displaceFor(cue, settings)
+      const voice = new SpotifyVoice(cue, () => this.masterLevel(), (msg) => this.onStreamError?.(msg))
+      this.register(voice)
+      return voice
+    }
+
+    // Prefer the already-decoded buffer so a tap is instant; only await on a miss.
+    const buffer = getCached(cue.audioId) ?? (await this.prime(cue))
+    if (!buffer || !this.master) return null
+
+    this.displaceFor(cue, settings)
+    const voice = new Voice(this.ctx, cue, buffer, this.master)
+    this.register(voice)
     return voice
   }
 

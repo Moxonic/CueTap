@@ -8,15 +8,36 @@ export type StopMode =
 
 export type FollowAction = 'none' | 'stopAll' | 'next' | 'goto'
 
+/**
+ * Where a cue's audio comes from.
+ *
+ * 'file' cues run through the Web Audio engine and get everything it offers.
+ * 'spotify' cues are played by Spotify's own SDK through a protected pipeline
+ * that cannot be routed into an AudioContext, so they are limited to what the
+ * SDK exposes: volume, seek, play, pause. See STREAM_LIMITS below.
+ */
+export type CueSource = 'file' | 'spotify'
+
+export interface SpotifyRef {
+  /** spotify:track:... */
+  uri: string
+  title: string
+  artist: string
+  artworkUrl?: string
+}
+
 export interface Cue {
   id: string
   name: string
   color: string
-  /** key into the IndexedDB audio blob store */
+  source: CueSource
+  /** key into the IndexedDB audio blob store; empty for streaming cues */
   audioId: string
-  /** full length of the source file, seconds */
+  /** set only when source is 'spotify' */
+  spotify?: SpotifyRef
+  /** full length of the source, seconds */
   duration: number
-  /** normalised 0..1 waveform peaks, precomputed at import */
+  /** normalised 0..1 waveform peaks; empty for streaming cues, which expose no waveform */
   peaks: number[]
 
   /** linear gain, 0..2 (edited in dB in the UI) */
@@ -100,10 +121,29 @@ export function newShow(): Show {
   }
 }
 
-export function makeCue(partial: Pick<Cue, 'name' | 'audioId' | 'duration' | 'peaks'>, index: number): Cue {
+/**
+ * What a streaming cue cannot do, and why. Kept next to the model so the editor
+ * and the docs cannot drift from the engine's actual behaviour.
+ */
+export const STREAM_LIMITS = {
+  /** No second player instance exists, so there is nothing to cross into. */
+  crossfadeLoop: 'Spotify has one player, so there is no second voice to crossfade into.',
+  /** Looping is a seek, which rebuffers. */
+  seamlessLoop: 'Looping seeks back to the in-point, which leaves a short audible gap.',
+  /** Audio never enters the AudioContext, so fades are stepped setVolume calls. */
+  fades: 'Fades are stepped volume changes rather than sample-accurate ramps.',
+  /** Only one Spotify stream can sound at once. */
+  layering: 'Only one Spotify cue can play at a time; it cannot layer with another Spotify cue.',
+} as const
+
+export function makeCue(
+  partial: Pick<Cue, 'name' | 'audioId' | 'duration' | 'peaks'> & Partial<Pick<Cue, 'source' | 'spotify'>>,
+  index: number,
+): Cue {
   return {
     id: crypto.randomUUID(),
     color: PAD_COLORS[index % PAD_COLORS.length],
+    source: 'file',
     gain: 1,
     inPoint: 0,
     outPoint: partial.duration,
@@ -127,4 +167,27 @@ export function cueLength(cue: Cue): number {
 
 export function isExclusive(cue: Cue, settings: ShowSettings): boolean {
   return cue.exclusiveOverride ?? settings.mode === 'exclusive'
+}
+
+/** Streaming cues have no waveform and cannot use the crossfade loop. */
+export function isStream(cue: Cue): boolean {
+  return cue.source === 'spotify'
+}
+
+/**
+ * Shows saved before streaming cues existed have no `source` field. Normalise on
+ * load so nothing downstream has to guard for it.
+ */
+export function migrateShow(show: Show): Show {
+  return {
+    ...show,
+    cues: show.cues.map((c) => ({
+      ...c,
+      source: c.source ?? 'file',
+      peaks: c.peaks ?? [],
+      // A file cue that lost its crossfade support would be a regression, but a
+      // stream cue can never honour one, so fold it back to a plain loop.
+      loop: c.source === 'spotify' && c.loop === 'crossfade' ? 'seamless' : c.loop,
+    })),
+  }
 }

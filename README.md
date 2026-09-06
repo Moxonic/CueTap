@@ -33,6 +33,8 @@ rail on the right, where GO becomes a tall thumb target:
   keep running under spot effects in an otherwise exclusive show.
 - **Import from anywhere** — the system file picker also reaches Google Drive, Dropbox and
   OneDrive when those apps are installed. No accounts to connect.
+- **Spotify cues** — a pad can play a Spotify track alongside your file cues, with its own trim,
+  volume, fades and follow-on. Requires Premium; see the limits below.
 - **Record** from the microphone or any external input, with a device picker for USB-C audio
   interfaces and the browser's speech processing turned off so music keeps its dynamics.
 - **Foot pedal support** — space, enter, right-arrow and page-down all fire GO, so most Bluetooth
@@ -85,33 +87,42 @@ stops everything.
 - **When finished** chains cues, with a delay that can go negative to overlap into the next one.
 - **Playback** overrides the show's one-at-a-time / layered default for this cue alone.
 
-## Recording from Spotify, YouTube or Apple Music
+## Spotify cues
 
-You cannot read those apps' audio streams directly. iOS exposes no system-audio API at all, and
-Android streaming apps mark their sessions `ALLOW_CAPTURE_BY_NONE` so `MediaProjection` hands back
-silence. `getDisplayMedia({ audio: true })` — the one web API that can capture tab or system audio
-— is desktop-only and is not implemented on Chrome for Android or iOS Safari at all. This is a DRM
-wall, not a gap in the web platform, and no app on either store gets around it.
+A cue can play a Spotify track instead of a local file. Set it up in **Settings → Spotify**:
 
-What does work is capturing the sound *after* it leaves the app, on the same phone:
+1. Create a free app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
+2. Add the redirect URI that Settings shows you, **exactly** as shown — a mismatch here is the
+   single most common reason the login fails. Each address you run CueTap on (localhost, your LAN
+   address, a hosted build) is a separate URI and all of them need registering.
+3. Paste the Client ID into Settings and connect.
 
-**1. Line loopback — the good one.** Plug in a USB-C audio interface and patch its output back
-into its input, then select it under **Input** in the recorder. The phone plays the track out and
-records it straight back at line level: clean stereo, no room noise. This is why the recorder has
-an input picker.
+Playback requires **Spotify Premium** — the Web Playback SDK refuses to start on a free account.
+The Client ID lives in your browser rather than in this repo, so every deployment brings its own.
 
-**2. Speaker to microphone — the quick one.** Start playback, come back to CueTap, and record the
-built-in mic while the track plays out loud. No extra hardware, but you get mono, room
-reflections, and whatever else the room is doing.
+### What a Spotify cue can and cannot do
 
-On iPhone, **start playback before you open the recorder** — Safari suspends audio the moment it
-is backgrounded, so you cannot leave CueTap to hit play mid-take. The recorder arms its input as
-soon as you open it, so watch the meter for a second to confirm the other app is still audible
-before committing to a take.
+Spotify decodes inside a protected pipeline that cannot be connected to an `AudioContext`, so none
+of the Web Audio machinery reaches it. A Spotify cue is driven through the SDK's own controls, and
+the difference is real:
 
-The recorder disables echo cancellation, noise suppression and auto gain — these are tuned for
-speech and would pump and gate music badly. Watch the meter, because nothing is protecting you
-from clipping.
+| | Local file cue | Spotify cue |
+| --- | --- | --- |
+| Volume | GainNode | `setVolume()` |
+| Fade in / out | Equal-power, sample-accurate | Stepped on a 50 ms timer |
+| Trim in / out | Sample-accurate | `seek()`, roughly 100 ms |
+| Seamless loop | Zero gap, no drift | Seeks back — short audible gap each pass |
+| Crossfade loop | Yes | Not possible — there is only one player |
+| Layering | Unlimited | One Spotify cue at a time |
+| Trigger latency | Effectively zero, plays from RAM | 0.5–3 s of buffering |
+| Offline | Works | Needs a network connection |
+
+The editor hides the controls a Spotify cue cannot honour rather than letting you set something
+that will not be heard.
+
+**Use Spotify cues for preshow, interval and playoff music.** Use a local file for anything that
+has to land on a visual cue — a doorbell or a thunder crack triggered over the network will arrive
+late, and will not arrive at all if the wifi drops.
 
 ## How storage works
 
@@ -156,6 +167,8 @@ extra width becomes more pads at the same comfortable size, instead of a few eno
   track, but a backgrounded or locked phone can still have its audio suspended by the OS, most
   aggressively on iOS.
 - **A show lives on one phone.** No export or sync yet — the first thing worth adding.
+- **Spotify cues need the network and buffer before they start.** Fine for music beds, wrong for
+  spot effects. They also cannot layer, crossfade-loop, or loop without a small gap.
 - **Drag-to-reorder is desktop-only**; touch browsers do not fire HTML5 drag events. On a phone,
   reorder from the Order controls in the cue editor.
 - **No OSC.** Browsers have no UDP, so it would need a WebSocket-to-OSC bridge running on a

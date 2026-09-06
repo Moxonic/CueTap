@@ -57,12 +57,17 @@ export default function Waveform({
     const inX = (inPoint / duration) * width
     const outX = (outPoint / duration) * width
 
+    // Streaming cues expose no waveform data. Draw an honest flat band rather
+    // than a synthetic shape that would imply detail the app does not have.
+    const flat = peaks.length === 0
     for (let x = 0; x < width; x++) {
-      const peak = peaks[Math.floor((x / width) * peaks.length)] ?? 0
+      const peak = flat ? 0.34 : (peaks[Math.floor((x / width) * peaks.length)] ?? 0)
       const bar = Math.max(1, peak * (h * 0.86))
       const inside = x >= inX && x <= outX
       ctx.fillStyle = inside ? color : 'rgba(255,255,255,0.13)'
+      ctx.globalAlpha = flat ? 0.45 : 1
       ctx.fillRect(x, mid - bar / 2, 1, bar)
+      ctx.globalAlpha = 1
     }
 
     // Trimmed-away regions get knocked back further.

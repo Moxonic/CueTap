@@ -3,7 +3,15 @@ import { Field, Segmented, Sheet, Slider } from '../components/controls'
 import Waveform from '../components/Waveform'
 import { useStore } from '../data/store'
 import { formatDb, formatTime, dbToGain, gainToDb } from '../lib/format'
-import { PAD_COLORS, type Cue, type FollowAction, type LoopMode, type StopMode } from '../data/types'
+import {
+  isStream,
+  PAD_COLORS,
+  STREAM_LIMITS,
+  type Cue,
+  type FollowAction,
+  type LoopMode,
+  type StopMode,
+} from '../data/types'
 
 export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => void }) {
   const { show, updateCue, deleteCue, fire, stopCue, moveCue } = useStore()
@@ -13,6 +21,7 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
   const span = cue.outPoint - cue.inPoint
   const looping = cue.loop !== 'off'
   const index = show.cues.findIndex((c) => c.id === cue.id)
+  const stream = isStream(cue)
   // Mirrors Voice.startOneShot: the fade in gets priority and the fade out is
   // shortened to whatever is left, so say so rather than showing a value that
   // will not be heard.
@@ -34,6 +43,15 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
         )
       }
     >
+      {stream && (
+        <div className="stream-banner">
+          <span className="tag spotify">Spotify</span>
+          <span>
+            {cue.spotify?.title} — {cue.spotify?.artist}
+          </span>
+        </div>
+      )}
+
       <input
         className="name-input"
         value={cue.name}
@@ -148,23 +166,34 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
       <Field
         label="Loop"
         hint={
-          cue.loop === 'crossfade'
-            ? 'blends the seam — for material with no clean loop point'
-            : cue.loop === 'seamless'
-              ? 'sample-accurate, no drift'
-              : 'plays once'
+          stream
+            ? cue.loop === 'off'
+              ? 'plays once'
+              : 'seeks back — short gap at the seam'
+            : cue.loop === 'crossfade'
+              ? 'blends the seam — for material with no clean loop point'
+              : cue.loop === 'seamless'
+                ? 'sample-accurate, no drift'
+                : 'plays once'
         }
       >
         <Segmented<LoopMode>
           value={cue.loop}
           onChange={(v) => set({ loop: v })}
-          options={[
-            { value: 'off', label: 'One shot' },
-            { value: 'seamless', label: 'Seamless' },
-            { value: 'crossfade', label: 'Crossfade' },
-          ]}
+          options={
+            stream
+              ? [
+                  { value: 'off', label: 'One shot' },
+                  { value: 'seamless', label: 'Loop', title: STREAM_LIMITS.seamlessLoop },
+                ]
+              : [
+                  { value: 'off', label: 'One shot' },
+                  { value: 'seamless', label: 'Seamless' },
+                  { value: 'crossfade', label: 'Crossfade' },
+                ]
+          }
         />
-        {cue.loop === 'crossfade' && (
+        {!stream && cue.loop === 'crossfade' && (
           <Slider
             value={cue.loopCrossfade}
             min={0.05}
@@ -257,6 +286,21 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
           ]}
         />
       </Field>
+
+      {stream && (
+        <div className="note">
+          <p>
+            <b>What differs on a Spotify cue.</b> Spotify decodes in a protected pipeline that
+            cannot be routed into the audio engine, so this cue is driven through the SDK's own
+            controls instead.
+          </p>
+          <p>
+            {STREAM_LIMITS.fades} {STREAM_LIMITS.seamlessLoop} {STREAM_LIMITS.layering} It also
+            needs a network connection and takes up to a few seconds to start, so keep it for
+            preshow, interval and playoff music rather than anything that has to land on a visual.
+          </p>
+        </div>
+      )}
 
       <button
         className="danger"

@@ -11,7 +11,8 @@ import {
 import { engine } from '../audio/engine'
 import { cacheBuffer, computePeaks, decodeArrayBuffer, evict } from '../audio/decode'
 import * as db from './db'
-import { makeCue, newShow, type Cue, type Show, type ShowSettings } from './types'
+import { makeCue, migrateShow, newShow, type Cue, type Show, type ShowSettings } from './types'
+import type { TrackHit } from '../spotify/api'
 
 interface StoreValue {
   show: Show
@@ -30,6 +31,7 @@ interface StoreValue {
 
   importFiles: (files: File[]) => Promise<void>
   importBlob: (blob: Blob, name: string) => Promise<Cue | null>
+  addSpotifyCues: (tracks: TrackHit[]) => void
   updateCue: (id: string, patch: Partial<Cue>) => void
   deleteCue: (id: string) => void
   moveCue: (from: number, to: number) => void
@@ -67,7 +69,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const saved = await db.loadShow()
-        if (!cancelled && saved) setShow({ ...newShow(), ...saved })
+        if (!cancelled && saved) setShow(migrateShow({ ...newShow(), ...saved }))
       } catch (e) {
         if (!cancelled) setError(`Could not load the saved show: ${String(e)}`)
       } finally {
@@ -227,6 +229,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [ingest],
   )
 
+  /**
+   * Spotify cues carry no blob and no waveform — the track lives on Spotify and
+   * is addressed by URI, so there is nothing to store locally beyond the
+   * reference and the cue's own settings.
+   */
+  const addSpotifyCues = useCallback((tracks: TrackHit[]) => {
+    if (tracks.length === 0) return
+    setShow((s) => {
+      const added = tracks.map((t, i) =>
+        makeCue(
+          {
+            name: `${t.title} — ${t.artist}`,
+            source: 'spotify',
+            spotify: { uri: t.uri, title: t.title, artist: t.artist, artworkUrl: t.artworkUrl },
+            audioId: '',
+            duration: t.durationMs / 1000,
+            peaks: [],
+          },
+          s.cues.length + i,
+        ),
+      )
+      return { ...s, cues: [...s.cues, ...added] }
+    })
+  }, [])
+
+  // Streaming failures surface at fire time (network, token, Premium), long
+  // after the cue was created, so they need a channel to the UI.
+  useEffect(() => {
+    engine.onStreamError = (msg) => setError(msg)
+    return () => {
+      engine.onStreamError = null
+    }
+  }, [])
+
   const updateCue = useCallback((id: string, patch: Partial<Cue>) => {
     setShow((s) => ({ ...s, cues: s.cues.map((c) => (c.id === id ? { ...c, ...patch } : c)) }))
     // Volume is the one edit that should be audible immediately on a playing cue.
@@ -285,7 +321,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // than waiting on IndexedDB and a decode.
   useEffect(() => {
     if (loading || !engineReady) return
-    void engine.primeAll(show.cues)
+    void engine.primeAll(show.cues.filter((c) => c.source !== 'spotify'))
     // Only when the set of audio files changes, not on every cue edit.
   }, [loading, engineReady, show.cues.map((c) => c.audioId).join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -304,6 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setStandby,
       importFiles,
       importBlob,
+      addSpotifyCues,
       updateCue,
       deleteCue,
       moveCue,
@@ -324,6 +361,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setStandby,
       importFiles,
       importBlob,
+      addSpotifyCues,
       updateCue,
       deleteCue,
       moveCue,

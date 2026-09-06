@@ -5,6 +5,9 @@ import { requestPersistence, storageEstimate } from '../data/db'
 import { useStore } from '../data/store'
 import { formatBytes, formatDb, dbToGain, gainToDb } from '../lib/format'
 import type { PadTrigger } from '../data/types'
+import { beginLogin, disconnect, getClientId, isConnected, redirectUri, setClientId } from '../spotify/auth'
+import { currentUser } from '../spotify/api'
+import { spotify } from '../spotify/player'
 
 export default function Settings({ onClose }: { onClose: () => void }) {
   const { show, updateSettings, renameShow, clearShow } = useStore()
@@ -121,6 +124,8 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         />
       </Field>
 
+      <SpotifySection />
+
       <div className="note">
         <p>
           <b>Storage.</b>{' '}
@@ -172,5 +177,96 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         </button>
       )}
     </Sheet>
+  )
+}
+
+/**
+ * Spotify connection.
+ *
+ * The Client ID is entered here rather than compiled in: this repo is public,
+ * and every deployment (localhost, LAN address, hosted build) is a different
+ * origin that must be registered as a redirect URI in the Spotify dashboard.
+ * Showing the exact URI to paste removes the single most common setup failure.
+ */
+function SpotifySection() {
+  const { setError } = useStore()
+  const [clientId, setClientIdState] = useState(getClientId())
+  const [connected, setConnected] = useState(isConnected())
+  const [account, setAccount] = useState<{ name: string; product: string } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const uri = redirectUri()
+
+  useEffect(() => {
+    if (!connected) {
+      setAccount(null)
+      return
+    }
+    void currentUser().then(setAccount)
+  }, [connected])
+
+  const connect = () => {
+    setClientId(clientId)
+    beginLogin().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+  }
+
+  const copyUri = () => {
+    void navigator.clipboard
+      ?.writeText(uri)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1600)
+      })
+      .catch(() => setError(`Copy failed. The redirect URI is: ${uri}`))
+  }
+
+  return (
+    <Field
+      label="Spotify"
+      hint={connected ? (account ? `${account.name} · ${account.product}` : 'connected') : 'not connected'}
+    >
+      {connected ? (
+        <>
+          {account && account.product !== 'premium' && (
+            <div className="warn">
+              This account is <b>{account.product}</b>. The Spotify player needs Premium — cues will
+              fail to start without it.
+            </div>
+          )}
+          <button
+            onClick={() => {
+              spotify.teardown()
+              disconnect()
+              setConnected(false)
+            }}
+          >
+            Disconnect Spotify
+          </button>
+        </>
+      ) : (
+        <>
+          <input
+            className="name-input"
+            value={clientId}
+            onChange={(e) => setClientIdState(e.target.value)}
+            placeholder="Spotify Client ID"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button className="linkish copy-uri" onClick={copyUri}>
+            {copied ? 'Copied' : `Copy redirect URI: ${uri}`}
+          </button>
+          <button className="primary" disabled={!clientId.trim()} onClick={connect}>
+            Connect Spotify
+          </button>
+          <div className="note">
+            <p>
+              Create a free app at <b>developer.spotify.com/dashboard</b>, add the redirect URI
+              above to it exactly as shown, then paste its Client ID here. Playback requires a
+              Spotify <b>Premium</b> account.
+            </p>
+          </div>
+        </>
+      )}
+    </Field>
   )
 }

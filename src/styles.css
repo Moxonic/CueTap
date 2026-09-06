@@ -1382,3 +1382,137 @@ button:disabled {
     border-color: var(--dim);
   }
 }
+
+/* --- spotify ------------------------------------------------------------- */
+
+:root {
+  --spotify: #1db954;
+}
+
+.icon.spotify {
+  color: var(--spotify);
+}
+
+.tag.spotify {
+  background: color-mix(in srgb, var(--spotify) 22%, transparent);
+  color: var(--spotify);
+}
+
+.stream-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--spotify) 10%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--spotify) 35%, transparent);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+.stream-banner span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warn {
+  padding: 9px 11px;
+  background: #3a2f20;
+  border: 1px solid #7a5f32;
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.copy-uri {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  text-align: left;
+}
+
+.mini-wide {
+  padding: 7px 12px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+
+/* --- spotify search results ---------------------------------------------- */
+
+.hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  text-align: left;
+  border-radius: 10px;
+}
+
+.hit.on {
+  border-color: var(--spotify);
+  background: color-mix(in srgb, var(--spotify) 16%, var(--panel-2));
+}
+
+.hit img,
+.hit-art {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--bg);
+  object-fit: cover;
+}
+
+.hit-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.hit-text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.hit-text em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.hit-time {
+  flex: 0 0 auto;
+  color: var(--dim);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hit-check {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  color: var(--spotify);
+  font-weight: 700;
+}

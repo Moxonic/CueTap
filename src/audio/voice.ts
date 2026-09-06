@@ -1,5 +1,6 @@
 import { DECLICK, fadeIn as rampIn, fadeOut as rampOut, fadeInShape, fadeOutShape, rampShaped } from './fades'
 import { cueLength, type Cue, type StopMode } from '../data/types'
+import type { PlayableVoice } from './playable'
 
 /** How far ahead the crossfade-loop scheduler queues passes. */
 const LOOKAHEAD = 1.0
@@ -20,7 +21,7 @@ interface Pass {
  *  - levelGain carries the user's volume, so it can be dragged live without
  *              colliding with a fade that is already scheduled on fadeGain.
  */
-export class Voice {
+export class Voice implements PlayableVoice {
   readonly id = crypto.randomUUID()
   readonly cueId: string
   readonly cue: Cue
@@ -46,8 +47,8 @@ export class Voice {
   stopped = false
   releasing = false
 
-  onEnd: ((v: Voice) => void) | null = null
-  onFollow: ((v: Voice) => void) | null = null
+  onEnd: ((v: PlayableVoice) => void) | null = null
+  onFollow: ((v: PlayableVoice) => void) | null = null
 
   constructor(ctx: AudioContext, cue: Cue, buffer: AudioBuffer, dest: AudioNode) {
     this.ctx = ctx
