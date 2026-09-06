@@ -1,5 +1,6 @@
 import { getAccessToken, isConnected } from './auth'
 import { playOnDevice } from './api'
+import { drmProblem } from './drm'
 
 const SDK_SRC = 'https://sdk.scdn.co/spotify-player.js'
 
@@ -92,6 +93,17 @@ class SpotifyPlayback {
     if (this.ready) return this.ready
     this.ready = (async () => {
       if (!isConnected()) throw new Error('Not connected to Spotify.')
+
+      // Before the SDK gets a chance to fail unrecoverably inside its own
+      // pipeline. Recorded on `error` so the arm step surfaces it too, not only
+      // the first cue that tries to play.
+      const drm = await drmProblem()
+      if (drm) {
+        this.error = drm
+        this.emit()
+        throw new Error(drm)
+      }
+
       await loadSdk()
       if (!window.Spotify) throw new Error('Spotify player failed to initialise.')
 

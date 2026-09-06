@@ -1,4 +1,5 @@
 import { getAccessToken } from './auth'
+import { drmProblem } from './drm'
 import type { SpotifyRef } from '../data/types'
 
 const API = 'https://api.spotify.com/v1'
@@ -182,6 +183,16 @@ export async function diagnose(): Promise<Diagnosis> {
   } catch (e) {
     ok = false
     lines.push(`Search: network error — ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  // 4. Can this browser decrypt the stream at all? Independent of the account,
+  // and the one failure that leaves search working but playback impossible.
+  const drm = await drmProblem()
+  if (drm) {
+    ok = false
+    lines.push(`Playback: ${drm}`)
+  } else {
+    lines.push('Playback: DRM available')
   }
 
   return { ok, lines }
