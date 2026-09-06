@@ -9,10 +9,9 @@ import Recorder from './views/Recorder'
 import Settings from './views/Settings'
 import ArmScreen from './views/ArmScreen'
 import SpotifySearch from './views/SpotifySearch'
+import AddCue from './views/AddCue'
 import { completeLoginFromRedirect, isConnected, subscribeAuth } from './spotify/auth'
 import Transport from './components/Transport'
-import SpotifyMark from './components/SpotifyMark'
-import RecordMark from './components/RecordMark'
 
 export type ViewMode = 'pads' | 'list'
 
@@ -22,7 +21,7 @@ export default function App() {
   const [armed, setArmed] = useState(false)
   const [view, setView] = useState<ViewMode>('list')
   const [editing, setEditing] = useState<string | null>(null)
-  const [overlay, setOverlay] = useState<'none' | 'recorder' | 'settings' | 'spotify'>('none')
+  const [overlay, setOverlay] = useState<'none' | 'add' | 'recorder' | 'settings' | 'spotify'>('none')
   const fileInput = useRef<HTMLInputElement>(null)
   const [spotifyOn, setSpotifyOn] = useState(isConnected())
 
@@ -99,19 +98,8 @@ export default function App() {
           </span>
         </div>
         <div className="top-actions">
-          <button className="icon" onClick={() => fileInput.current?.click()} aria-label="Add audio files">
+          <button className="icon" onClick={() => setOverlay('add')} aria-label="Add a cue">
             ＋
-          </button>
-          <button
-            className={`icon spotify${spotifyOn ? '' : ' muted'}`}
-            onClick={() => setOverlay('spotify')}
-            aria-label={spotifyOn ? 'Add from Spotify' : 'Add from Spotify — not connected'}
-            title={spotifyOn ? 'Add from Spotify' : 'Spotify is not connected'}
-          >
-            <SpotifyMark size={20} muted={!spotifyOn} />
-          </button>
-          <button className="icon record" onClick={() => setOverlay('recorder')} aria-label="Record">
-            <RecordMark size={20} />
           </button>
           <button className="icon" onClick={() => setOverlay('settings')} aria-label="Settings">
             ⚙
@@ -134,11 +122,7 @@ export default function App() {
 
       <main className="stage">
         {show.cues.length === 0 ? (
-          <EmptyState
-            onAdd={() => fileInput.current?.click()}
-            onRecord={() => setOverlay('recorder')}
-            onSpotify={() => setOverlay('spotify')}
-          />
+          <EmptyState onAdd={() => setOverlay('add')} />
         ) : view === 'pads' ? (
           <PadGrid transport={transport} onEdit={setEditing} />
         ) : (
@@ -149,11 +133,24 @@ export default function App() {
       <Transport view={view} transport={transport} onPanic={panic} />
 
       {editingCue && <CueEditor cue={editingCue} onClose={() => setEditing(null)} />}
+      {overlay === 'add' && (
+        <AddCue
+          onClose={() => setOverlay('none')}
+          onFiles={() => {
+            // The picker is a native dialog, not React state, so closing the
+            // sheet first and opening it after are independent — no batching
+            // hazard here, unlike routing to another overlay (see AddCue.tsx).
+            setOverlay('none')
+            fileInput.current?.click()
+          }}
+          onSpotify={() => setOverlay('spotify')}
+          onRecord={() => setOverlay('recorder')}
+          spotifyConnected={spotifyOn}
+        />
+      )}
       {overlay === 'recorder' && <Recorder onClose={() => setOverlay('none')} />}
       {overlay === 'settings' && <Settings onClose={() => setOverlay('none')} />}
-      {overlay === 'spotify' && (
-        <SpotifySearch onClose={() => setOverlay('none')} onNeedsSetup={() => setOverlay('settings')} />
-      )}
+      {overlay === 'spotify' && <SpotifySearch onClose={() => setOverlay('none')} />}
 
       {error && (
         <div className="toast" role="alert">
@@ -165,28 +162,15 @@ export default function App() {
   )
 }
 
-function EmptyState({
-  onAdd,
-  onRecord,
-  onSpotify,
-}: {
-  onAdd: () => void
-  onRecord: () => void
-  onSpotify: () => void
-}) {
+function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="empty">
       <h2>No cues yet</h2>
-      <p>
-        Add audio from your phone. The system file picker also reaches Google Drive, Dropbox and
-        OneDrive if those apps are installed.
-      </p>
+      <p>Add a cue from your phone's files, Spotify, or by recording something.</p>
       <div className="empty-actions">
         <button className="primary" onClick={onAdd}>
-          Add audio files
+          ＋ Add a cue
         </button>
-        <button onClick={onSpotify}>Add from Spotify</button>
-        <button onClick={onRecord}>Record something</button>
       </div>
     </div>
   )

@@ -1702,3 +1702,66 @@ button:disabled {
   border-color: color-mix(in srgb, var(--go) 40%, var(--line));
   color: #a9e8bd;
 }
+
+/* --- add-cue chooser ------------------------------------------------------ */
+
+.add-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-option {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.add-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.add-icon.files {
+  color: var(--accent);
+}
+
+.add-icon.record {
+  color: var(--stop);
+}
+
+.add-icon.spotify svg {
+  display: block;
+}
+
+.add-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.add-text b {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.add-text em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

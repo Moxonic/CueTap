@@ -75,6 +75,9 @@ For an actual show, prefer a real build: `npm run build`, then host `dist/` anyw
 **Arm first.** Pair your Bluetooth speaker, then tap to arm. Phones will not let any web page make
 a sound until something is tapped, so this is a deliberate step rather than a surprise on cue 1.
 
+**Adding a cue.** The **＋** button opens one chooser for all three sources — audio files, Spotify,
+or the recorder — rather than three separate buttons competing for header space.
+
 **Pads.** Tap to fire. Tap a playing pad to stop it (configurable — restart or stack instead).
 Hold a pad to edit it.
 
@@ -98,13 +101,17 @@ stops everything.
 
 ## Spotify cues
 
-A cue can play a Spotify track instead of a local file. Set it up in **Settings → Spotify**:
+A cue can play a Spotify track instead of a local file. Open it from **＋ → Spotify** — connecting
+an account, the search box, and the "Test connection" diagnostic all live in that one window,
+rather than being split off into Settings.
+
+The first time, the same window walks you through setup:
 
 1. Create a free app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
-2. Add the redirect URI that Settings shows you, **exactly** as shown. Each address you run CueTap
-   on (your dev machine, your LAN address, a hosted build) is a separate URI and all of them need
+2. Add the redirect URI it shows you, **exactly** as shown. Each address you run CueTap on (your
+   dev machine, your LAN address, a hosted build) is a separate URI and all of them need
    registering.
-3. Paste the Client ID into Settings and connect.
+3. Paste the Client ID in and connect.
 
 > **`localhost` will not work.** Since April 2025 Spotify requires HTTPS, or an explicit loopback
 > literal — [`localhost` is rejected outright](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri),
