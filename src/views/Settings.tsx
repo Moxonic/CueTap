@@ -19,7 +19,7 @@ import {
   normaliseClientId,
 } from '../spotify/auth'
 import SpotifyMark from '../components/SpotifyMark'
-import { currentUser } from '../spotify/api'
+import { currentUser, diagnose, type Diagnosis } from '../spotify/api'
 import { spotify } from '../spotify/player'
 
 export default function Settings({ onClose }: { onClose: () => void }) {
@@ -207,6 +207,8 @@ function SpotifySection() {
   const [connected, setConnected] = useState(isConnected())
   const [account, setAccount] = useState<{ name: string; product: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [report, setReport] = useState<Diagnosis | null>(null)
+  const [testing, setTesting] = useState(false)
   const uri = redirectUri()
   const problem = redirectUriProblem()
   const idOk = isValidClientId(clientId)
@@ -249,14 +251,34 @@ function SpotifySection() {
             fail to start without it.
           </div>
         )}
-        <button
-          onClick={() => {
-            spotify.teardown()
-            disconnect()
-          }}
-        >
-          Disconnect Spotify
-        </button>
+
+        {report && (
+          <pre className={`diag${report.ok ? ' ok' : ''}`}>{report.lines.join('\n')}</pre>
+        )}
+
+        <div className="wave-tools">
+          <button
+            disabled={testing}
+            onClick={() => {
+              setTesting(true)
+              setReport(null)
+              void diagnose()
+                .then(setReport)
+                .finally(() => setTesting(false))
+            }}
+          >
+            {testing ? 'Testing…' : 'Test connection'}
+          </button>
+          <button
+            onClick={() => {
+              spotify.teardown()
+              disconnect()
+              setReport(null)
+            }}
+          >
+            Disconnect
+          </button>
+        </div>
       </Field>
     )
   }
