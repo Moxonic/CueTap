@@ -5,3 +5,9 @@ dist-ssr/
 .DS_Store
 .vite/
 dev-dist/
+
+# Fetched audio, and the local helper that produces it. Kept out of the public
+# repo by default: yt-dlp is your own separately-installed tool and YouTube's
+# terms do not permit downloading. Delete these two lines to publish the script.
+downloads/
+scripts/fetch-audio.mjs
