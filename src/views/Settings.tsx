@@ -3,6 +3,7 @@ import { engine } from '../audio/engine'
 import { Field, Segmented, Sheet, Slider } from '../components/controls'
 import { requestPersistence, storageEstimate } from '../data/db'
 import { useStore } from '../data/store'
+import { drmProblem } from '../spotify/drm'
 import { formatBytes, formatDb, dbToGain, gainToDb } from '../lib/format'
 import type { PadTrigger } from '../data/types'
 
@@ -12,8 +13,11 @@ export default function Settings({ onClose }: { onClose: () => void }) {
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
+  /** undefined while the probe runs, then null for "fine" or the reason it is not. */
+  const [drm, setDrm] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
+    void drmProblem().then(setDrm)
     void storageEstimate().then(setStorage)
     // navigator.storage.persisted is absent on older Safari, so `?.()` yields
     // undefined and chaining .then onto it would throw.
@@ -148,6 +152,19 @@ export default function Settings({ onClose }: { onClose: () => void }) {
         <p>
           <b>Foot pedals.</b> Space, Enter, → and Page Down all fire GO, so most Bluetooth
           page-turner pedals work as a GO footswitch. Escape stops everything.
+        </p>
+        <p>
+          <b>Browser.</b> <b>Chrome</b> is the recommended browser, and Edge works the same way.
+          Everything except Spotify runs anywhere, but Spotify audio is DRM-protected: it will not
+          play in an embedded browser — VS Code's Simple Browser, an IDE preview pane, any in-app
+          webview — and not at all in Safari, which uses FairPlay rather than Widevine. Firefox
+          needs <i>Play DRM-controlled content</i> switched on.{' '}
+          {drm === null && <>This browser can play Spotify cues.</>}
+          {typeof drm === 'string' && (
+            <>
+              <b>This one cannot:</b> {drm}
+            </>
+          )}
         </p>
         <p>
           <b>Spotify.</b> Connect and manage the Spotify account from the ♫ button, not here.
