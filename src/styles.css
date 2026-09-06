@@ -1009,6 +1009,10 @@ button:disabled {
   color: var(--text);
 }
 
+.note a {
+  color: var(--accent);
+}
+
 .linkish {
   padding: 0;
   background: none;

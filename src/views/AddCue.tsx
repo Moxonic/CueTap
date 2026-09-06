@@ -60,6 +60,16 @@ export default function AddCue({
           </span>
         </button>
       </div>
+
+      <div className="note">
+        <p>
+          To use audio from a YouTube link, save it as an MP3 first with a downloader such as{' '}
+          <a href="https://ytdlp.online/" target="_blank" rel="noopener noreferrer">
+            ytdlp.online
+          </a>
+          , then bring that file in under <b>Audio files</b>.
+        </p>
+      </div>
     </Sheet>
   )
 }

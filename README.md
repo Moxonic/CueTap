@@ -32,7 +32,9 @@ rail on the right, where GO becomes a tall thumb target:
 - **One at a time, or layered** — a global mode with a per-cue override, so an ambience bed can
   keep running under spot effects in an otherwise exclusive show.
 - **Import from anywhere** — the system file picker also reaches Google Drive, Dropbox and
-  OneDrive when those apps are installed. No accounts to connect.
+  OneDrive when those apps are installed. No accounts to connect. For audio off a YouTube link,
+  save it as an MP3 first with a downloader such as [ytdlp.online](https://ytdlp.online/) and add
+  that file the same way.
 - **Spotify cues** — a pad can play a Spotify track alongside your file cues, with its own trim,
   volume, fades and follow-on. Requires Premium; see the limits below.
 - **Record** from the microphone or any external input, with a device picker for USB-C audio
@@ -76,7 +78,9 @@ For an actual show, prefer a real build: `npm run build`, then host `dist/` anyw
 a sound until something is tapped, so this is a deliberate step rather than a surprise on cue 1.
 
 **Adding a cue.** The **＋** button opens one chooser for all three sources — audio files, Spotify,
-or the recorder — rather than three separate buttons competing for header space.
+or the recorder — rather than three separate buttons competing for header space. There is no
+YouTube option: download the audio as an MP3 first (e.g. with [ytdlp.online](https://ytdlp.online/))
+and add it under **Audio files**.
 
 **Pads.** Tap to fire. Tap a playing pad to stop it (configurable — restart or stack instead).
 Hold a pad to edit it.
