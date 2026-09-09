@@ -69,10 +69,10 @@ export interface TrackHit extends SpotifyRef {
 
 // Spotify's search endpoint caps `limit` at 10 (default 5); asking for more is a
 // bare 400 "Invalid limit". The connection test uses limit=1, which is why it
-// passes while a real search fails.
-export async function searchTracks(query: string, limit = 10): Promise<TrackHit[]> {
+// passes while a real search fails. Hard-wired to 10 so no caller can trip that.
+export async function searchTracks(query: string): Promise<TrackHit[]> {
   if (!query.trim()) return []
-  const res = await call(`/search?type=track&limit=${limit}&q=${encodeURIComponent(query)}`)
+  const res = await call(`/search?type=track&limit=10&q=${encodeURIComponent(query)}`)
   if (!res.ok) throw new Error(await describeError(res))
   const j = (await res.json()) as {
     tracks: {
