@@ -9,7 +9,7 @@
  * use inside a coloured chip where a green circle would fight the chip.
  */
 export default function SpotifyMark({
-  size = 20,
+  size = 10,
   mono = false,
   muted = false,
 }: {

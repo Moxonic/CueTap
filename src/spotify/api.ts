@@ -35,10 +35,7 @@ export async function describeError(res: Response): Promise<string> {
 
   switch (res.status) {
     case 400:
-      return (
-        `Spotify rejected the request (400)${suffix}. If it mentions bearer authentication, the ` +
-        `saved token is not valid: disconnect and connect again in Settings.`
-      )
+      return `Spotify rejected the request (400)${suffix}. Check the request parameters.`
     case 401:
       return `Spotify rejected the session (401)${suffix}. Reconnect in Settings.`
     case 403:
