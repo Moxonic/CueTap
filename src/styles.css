@@ -1769,3 +1769,14 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Hide any "Powered by Netlify" badge the host injects. Nothing in this app
+   renders one, so this is a guard against the deploy platform adding it to the
+   page (fixed badge, an <a> to netlify.com with a utm_source tag). */
+a[href*="netlify.com"][href*="utm_source"],
+a[href*="netlify.app"][href*="utm_source"],
+[class*="netlify-badge"],
+[id*="netlify-badge"],
+#netlify-badge {
+  display: none !important;
+}
