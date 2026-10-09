@@ -73,7 +73,11 @@ export function SpotifySetup() {
 
       <ol className="steps">
         <li>
-          <span className="step-title">Create a free Spotify app</span>
+          <span className="step-title">Open the Spotify developer dashboard</span>
+          <p className="step-hint">
+            Log in with your ordinary Spotify account — the <b>Log in</b> button is in the
+            top-right corner. The first time, accept the developer Terms of Service when it asks.
+          </p>
           <a
             className="step-action"
             href="https://developer.spotify.com/dashboard"
@@ -85,7 +89,20 @@ export function SpotifySetup() {
         </li>
 
         <li>
-          <span className="step-title">Add this redirect URI to it</span>
+          <span className="step-title">Create an app</span>
+          <p className="step-hint">
+            Click <b>Create app</b>. Put anything in <i>App name</i> and <i>App description</i>.
+            Under <i>Which API/SDKs are you planning to use?</i> tick <b>Web API</b> and{' '}
+            <b>Web Playback SDK</b>.
+          </p>
+        </li>
+
+        <li>
+          <span className="step-title">Add this redirect URI to the app</span>
+          <p className="step-hint">
+            Paste it into the app's <i>Redirect URIs</i> box, click <b>Add</b>, then <b>Save</b> at
+            the bottom of the form.
+          </p>
           {problem ? (
             <div className="warn">
               <b>This address will not work.</b> {problem}
@@ -102,7 +119,15 @@ export function SpotifySetup() {
         </li>
 
         <li>
-          <span className="step-title">Paste its Client ID</span>
+          <span className="step-title">Copy the app's Client ID</span>
+          <p className="step-hint">
+            Open the app you just made and go to <b>Settings</b> (top-right). The <b>Client ID</b>{' '}
+            is near the top of that page — copy it.
+          </p>
+        </li>
+
+        <li>
+          <span className="step-title">Paste the Client ID here</span>
           <input
             className="name-input"
             value={clientId}
@@ -139,8 +164,8 @@ export function SpotifySetup() {
       <div className="note">
         <p>
           Playback needs Spotify <b>Premium</b>. A new dashboard app starts in development mode,
-          which is fine — you are already on its allowlist as its owner. Make sure <b>Web API</b> is
-          ticked among the app's APIs, or searching will be refused.
+          which is fine — you are already on its allowlist as its owner. If <b>Web API</b> is not
+          ticked among the app's APIs, searching will be refused.
         </p>
       </div>
     </>

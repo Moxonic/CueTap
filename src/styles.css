@@ -810,6 +810,24 @@ button:disabled {
   height: 96px;
 }
 
+/* Held a trim handle still: the strip is zoomed in around it. */
+.wave.zoomed {
+  border-color: var(--accent);
+}
+
+.wave-zoom {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 10.5px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .wave-handle {
   position: absolute;
   top: 0;
@@ -1662,6 +1680,23 @@ button:disabled {
 .step-title {
   font-size: 13.5px;
   font-weight: 600;
+}
+
+.step-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+.step-hint b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.step-hint i {
+  font-style: normal;
+  color: var(--text);
 }
 
 .step-action {

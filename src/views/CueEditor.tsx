@@ -190,8 +190,8 @@ export default function CueEditor({ cue, onClose }: { cue: Cue; onClose: () => v
                 ]
               : [
                   { value: 'off', label: 'One shot' },
-                  { value: 'seamless', label: 'Seamless' },
-                  { value: 'crossfade', label: 'Crossfade' },
+                  { value: 'seamless', label: 'Loop' },
+                  { value: 'crossfade', label: 'XFade Loop' },
                 ]
           }
         />
