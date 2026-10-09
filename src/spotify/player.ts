@@ -13,7 +13,6 @@ interface SpotifyPlayer {
   seek(ms: number): Promise<void>
   pause(): Promise<void>
   resume(): Promise<void>
-  getCurrentState(): Promise<{ position: number; paused: boolean; duration: number } | null>
   /**
    * Unlock the SDK's internal <audio> element. Browsers require this to be
    * called from a user gesture; without it playback transfers to the device
@@ -28,6 +27,31 @@ declare global {
     Spotify?: { Player: new (opts: Record<string, unknown>) => SpotifyPlayer }
     onSpotifyWebPlaybackSDKReady?: () => void
   }
+}
+
+/** The parts of the SDK's player_state_changed payload we read. */
+interface SdkState {
+  position: number
+  paused: boolean
+  loading?: boolean
+  track_window?: { current_track?: { uri: string; linked_from?: { uri: string | null } } }
+}
+
+/**
+ * The SDK's most recent state change, stamped on our own clock.
+ *
+ * `position` is where the track was at that moment, not a live reading — the SDK
+ * only reports on change (play, pause, seek, buffering). A live position is
+ * `position + (now - at)` while not paused.
+ */
+export interface StreamState {
+  /** The playing track, plus the URI it was relinked from if Spotify swapped it. */
+  uris: string[]
+  position: number
+  /** Also true while the SDK is loading, so a buffering track does not advance. */
+  paused: boolean
+  /** performance.now() when the state arrived. */
+  at: number
 }
 
 let sdkLoad: Promise<void> | null = null
@@ -52,10 +76,17 @@ class SpotifyPlayback {
   private deviceId = ''
   private ready: Promise<void> | null = null
   private listeners = new Set<() => void>()
+  /** A play/seek/resume went out; the next SDK state is news even if it looks familiar. */
+  private commandSent = false
 
-  /** Last known transport state, refreshed by the SDK's own player_state_changed. */
-  lastPosition = 0
-  lastPaused = true
+  state: StreamState | null = null
+  /**
+   * The voice currently driving the player. There is one stream, so a voice that
+   * has been displaced must stop touching volume and transport — its fade-out
+   * would otherwise duck, and its final pause would silence, the cue that
+   * replaced it.
+   */
+  owner: string | null = null
   error: string | null = null
 
   subscribe(fn: () => void): () => void {
@@ -137,10 +168,31 @@ class SpotifyPlayback {
         this.emit()
       }) as never)
 
-      player.addListener('player_state_changed', ((s: { position: number; paused: boolean } | null) => {
-        if (!s) return
-        this.lastPosition = s.position
-        this.lastPaused = s.paused
+      player.addListener('player_state_changed', ((s: SdkState | null) => {
+        if (!s) {
+          this.state = null
+          return
+        }
+        const track = s.track_window?.current_track
+        const uris = [track?.uri, track?.linked_from?.uri].filter((u): u is string => !!u)
+        const paused = s.paused || !!s.loading
+        const prev = this.state
+        // The SDK re-announces an unchanged state while a track plays, still
+        // carrying the position from when playback began. Re-stamping it would
+        // snap the extrapolated position back to that point on every repeat —
+        // the playhead loops over the same second. Keep the original stamp
+        // unless a command has gone out since, or something actually changed.
+        if (
+          !this.commandSent &&
+          prev &&
+          prev.position === s.position &&
+          prev.paused === paused &&
+          prev.uris[0] === uris[0]
+        ) {
+          return
+        }
+        this.commandSent = false
+        this.state = { uris, position: s.position, paused, at: performance.now() }
       }) as never)
 
       for (const kind of ['initialization_error', 'authentication_error', 'account_error', 'playback_error']) {
@@ -175,20 +227,29 @@ class SpotifyPlayback {
 
   async play(uri: string, positionMs: number): Promise<void> {
     await this.init()
+    this.commandSent = true
     await playOnDevice(this.deviceId, uri, positionMs)
-    this.lastPaused = false
   }
 
   async pause(): Promise<void> {
     try {
       await this.player?.pause()
-      this.lastPaused = true
     } catch {
       /* already stopped */
     }
   }
 
+  async resume(): Promise<void> {
+    this.commandSent = true
+    try {
+      await this.player?.resume()
+    } catch {
+      /* transient */
+    }
+  }
+
   async seek(ms: number): Promise<void> {
+    this.commandSent = true
     try {
       await this.player?.seek(Math.max(0, Math.round(ms)))
     } catch {
@@ -204,19 +265,6 @@ class SpotifyPlayback {
     }
   }
 
-  /** Live position in ms, or null when nothing is loaded. */
-  async position(): Promise<number | null> {
-    try {
-      const s = await this.player?.getCurrentState()
-      if (!s) return null
-      this.lastPosition = s.position
-      this.lastPaused = s.paused
-      return s.position
-    } catch {
-      return null
-    }
-  }
-
   teardown(): void {
     try {
       this.player?.disconnect()
@@ -226,6 +274,8 @@ class SpotifyPlayback {
     this.player = null
     this.deviceId = ''
     this.ready = null
+    this.state = null
+    this.owner = null
     this.emit()
   }
 }

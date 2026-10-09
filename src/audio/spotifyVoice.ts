@@ -5,8 +5,6 @@ import type { PlayableVoice } from './playable'
 
 /** Envelope/transport tick. 20 steps a second is as smooth as setVolume gets. */
 const TICK_MS = 50
-/** Reconcile the local clock against the SDK this often. */
-const RECONCILE_MS = 1000
 
 /**
  * A playing Spotify cue.
@@ -18,7 +16,8 @@ const RECONCILE_MS = 1000
  *
  *  - fades are stepped setVolume calls on a 50ms timer
  *  - looping is a seek back to the in-point, which rebuffers and leaves a gap
- *  - position is a local clock, periodically reconciled with the SDK
+ *  - position is extrapolated from the SDK's last state change, with a local
+ *    clock covering the moment between a command and the SDK reporting on it
  *
  * The engine treats it like any other voice; the editor is responsible for not
  * offering controls this cannot honour.
@@ -40,10 +39,17 @@ export class SpotifyVoice implements PlayableVoice {
   private timer: ReturnType<typeof setInterval> | null = null
   private followTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** SDK position (ms) at the last reconcile, and the local clock reading then. */
+  /** Local clock: track position (ms) at the last play/seek, and when that landed. */
   private anchorMs = 0
   private anchorAt = 0
-  private lastReconcile = 0
+  /**
+   * When the last play/seek was issued. SDK states from before it describe the
+   * previous track or the pre-seek position, and acting on one sends a loop
+   * straight back to its in-point.
+   */
+  private commandAt = 0
+  /** Seen this track actually playing since the last command. */
+  private sawPlaying = false
   private playing = false
   /** Set while a loop seek is in flight so the tick does not fire it twice. */
   private seeking = false
@@ -63,26 +69,33 @@ export class SpotifyVoice implements PlayableVoice {
     return this.cue.loop !== 'off'
   }
 
+  private get owns(): boolean {
+    return spotify.owner === this.id
+  }
+
   /** cue gain * master * envelope, clamped to what setVolume accepts. */
   private applyVolume(): void {
+    if (!this.owns) return
     void spotify.setVolume(Math.max(0, Math.min(1, this.level * this.getMaster() * this.envelope)))
   }
 
   start(): void {
+    spotify.owner = this.id
     this.envelope = this.cue.fadeIn > 0 ? 0 : 1
     this.applyVolume()
 
+    this.commandAt = performance.now()
     void spotify
       .play(this.cue.spotify!.uri, this.cue.inPoint * 1000)
       .then(() => {
         if (this.stopped) {
-          // Stopped while the network call was in flight.
-          void spotify.pause()
+          // Stopped while the network call was in flight — unless another cue
+          // has taken the player since, in which case the audio is theirs.
+          if (spotify.owner === null) void spotify.pause()
           return
         }
         this.anchorMs = this.cue.inPoint * 1000
         this.anchorAt = performance.now()
-        this.lastReconcile = performance.now()
         this.playing = true
         this.applyVolume()
       })
@@ -104,8 +117,21 @@ export class SpotifyVoice implements PlayableVoice {
     }
   }
 
-  /** Milliseconds into the track, interpolated between SDK reconciles. */
+  /** Milliseconds into the track. */
   private positionMs(): number {
+    const s = spotify.state
+    if (s && s.at > this.commandAt && s.uris.includes(this.cue.spotify!.uri)) {
+      if (!s.paused) {
+        this.sawPlaying = true
+        return s.position + (performance.now() - s.at)
+      }
+      // Spotify parks a track that ran out at 0, paused. Arriving there after
+      // playing means the end came before the out-point check caught it.
+      if (s.position === 0 && this.sawPlaying) return this.cue.outPoint * 1000
+      // Buffering, or paused from elsewhere: the track is not moving, so
+      // neither is the cue.
+      return s.position
+    }
     if (!this.playing) return this.cue.inPoint * 1000
     return this.anchorMs + (performance.now() - this.anchorAt)
   }
@@ -113,16 +139,10 @@ export class SpotifyVoice implements PlayableVoice {
   private tick(): void {
     if (this.stopped) return
 
-    // Keep the local clock honest. Buffering and seeks both make it drift.
-    const now = performance.now()
-    if (this.playing && !this.seeking && now - this.lastReconcile > RECONCILE_MS) {
-      this.lastReconcile = now
-      void spotify.position().then((ms) => {
-        if (ms !== null && !this.seeking && !this.stopped) {
-          this.anchorMs = ms
-          this.anchorAt = performance.now()
-        }
-      })
+    // Another Spotify cue has taken the player; this one's audio is gone.
+    if (!this.owns) {
+      this.finish()
+      return
     }
 
     const elapsed = this.positionMs() / 1000 - this.cue.inPoint
@@ -153,12 +173,17 @@ export class SpotifyVoice implements PlayableVoice {
 
   private loopAround(): void {
     this.seeking = true
-    void spotify.seek(this.cue.inPoint * 1000).then(() => {
-      this.anchorMs = this.cue.inPoint * 1000
-      this.anchorAt = performance.now()
-      this.lastReconcile = performance.now()
-      this.seeking = false
-    })
+    this.commandAt = performance.now()
+    this.sawPlaying = false
+    void spotify
+      .seek(this.cue.inPoint * 1000)
+      // A track that ran to its end is left paused, and a seek alone keeps it there.
+      .then(() => spotify.resume())
+      .then(() => {
+        this.anchorMs = this.cue.inPoint * 1000
+        this.anchorAt = performance.now()
+        this.seeking = false
+      })
   }
 
   position(): number {
@@ -217,6 +242,11 @@ export class SpotifyVoice implements PlayableVoice {
         clearInterval(step)
         return
       }
+      if (!this.owns) {
+        clearInterval(step)
+        this.finish()
+        return
+      }
       const t = Math.min(1, (performance.now() - startedAt) / (seconds * 1000))
       this.envelope = from * fadeOutShape(t)
       this.applyVolume()
@@ -235,10 +265,14 @@ export class SpotifyVoice implements PlayableVoice {
     if (this.followTimer !== null) clearTimeout(this.followTimer)
     this.timer = null
     this.followTimer = null
-    void spotify.pause().then(() => {
-      // Leave the SDK at full volume so the next cue's own envelope starts clean.
-      void spotify.setVolume(1)
-    })
+    if (this.owns) {
+      spotify.owner = null
+      void spotify.pause().then(() => {
+        // Leave the SDK at full volume so the next cue's own envelope starts
+        // clean — unless that cue has already started and set its own.
+        if (spotify.owner === null) void spotify.setVolume(1)
+      })
+    }
     this.onEnd?.(this)
   }
 }
